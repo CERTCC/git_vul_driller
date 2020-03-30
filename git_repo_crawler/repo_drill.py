@@ -148,7 +148,30 @@ def commits_to_df(commits):
     return df
 
 
+def pull_repo(repo_path):
+    repo = git.Repo(repo_path)
+
+    # see if it's time to refresh yet
+    commit = repo.head.commit
+    last_update = commit.committed_datetime.timestamp()
+    now = datetime.now().timestamp()
+    time_since = now - last_update
+
+    if time_since < REFRESH_AFTER_SECONDS:
+        # not time to refresh yet
+        logger.debug(
+            f"Skipping refresh ({time_since} of {REFRESH_AFTER_SECONDS} elapsed)"
+        )
+        return
+
+    logger.info(f"Pulling {repo_path} from origin")
+    # if you got here, it's time to refresh
+    o = repo.remotes.origin
+    o.pull()
+
+
 def process_repo(repo_path):
+    pull_repo(repo_path)
 
     logger.info(f"Processing repo {repo_path}")
 
