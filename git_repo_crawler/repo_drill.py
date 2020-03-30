@@ -5,11 +5,33 @@ author: adh
 created_at: 3/27/20 11:45 AM
 """
 from pydriller import RepositoryMining, GitRepository
-from pprint import pprint
-from multiprocessing import Pool
 from datetime import datetime
 from git_repo_crawler.patterns import PATTERN, normalize
 import pandas as pd
+import logging
+import git
+
+# set up logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# create file handler which logs even debug messages
+fh = logging.FileHandler(filename="../log/repo_drill.log", mode="w")
+fh.setLevel(logging.DEBUG)
+# create console handler with a higher log level
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+# create formatter and add it to the handlers
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+fh.setFormatter(formatter)
+ch.setFormatter(formatter)
+# add the handlers to the logger
+logger.addHandler(fh)
+logger.addHandler(ch)
+
+LOG_INTERVAL = 200
+
+# how often to refresh the git repo, in seconds
+REFRESH_AFTER_SECONDS = 3600 * 4
 
 commit_fields = [
     "hash",
@@ -41,14 +63,10 @@ modification_fields = [
 repo = "../data/metasploit-framework"
 
 
-def process_chunk(chunk):
-    for commit in chunk:
-        yield process_commit(commit)
-
-
 def process_modifications(mod):
     mod_data = {k: getattr(mod, k, None) for k in modification_fields}
 
+    # pull the actual changes out of the parsed diff
     mod_data["added"] = mod_data["diff_parsed"]["added"]
     mod_data["deleted"] = mod_data["diff_parsed"]["deleted"]
     del mod_data["diff_parsed"]
@@ -74,10 +92,20 @@ def find_vul_ids(commit_data):
                 m = normalize(m)
                 rec = (m, mod["new_path"])
                 matches.add(rec)
+
+    if len(matches):
+        logger.debug(f"matched {len(matches)} ids")
+        for m in matches:
+            logger.debug(f"match: {m}")
+
+    # note we don't bother to check in the deletes because we don't really care
+    # if the string disappeared
+
     return matches
 
 
 def process_commit(commit):
+    logger.debug(f"processing commit: {commit.hash}")
     commit_data = {k: getattr(commit, k, None) for k in commit_fields}
 
     commit_data["modifications"] = [
@@ -98,6 +126,7 @@ def process_commit(commit):
 
 
 def invert_refs(record):
+    logger.debug("inverting references")
     refs = record.get("vul_ids")
     fields = [k for k in record.keys() if k != "vul_ids"]
 
@@ -111,6 +140,7 @@ def invert_refs(record):
 
 
 def commits_to_df(commits):
+    logger.info("creating dataframe")
     df = pd.DataFrame(commits)
     df["author_date"] = pd.to_datetime(df["author_date"], utc=True)
     df["committer_date"] = pd.to_datetime(df["committer_date"], utc=True)
@@ -119,15 +149,25 @@ def commits_to_df(commits):
 
 
 def process_repo(repo_path):
-    miner = RepositoryMining(repo_path, since=datetime(2020, 1, 1, 0, 0, 0))
+
+    logger.info(f"Processing repo {repo_path}")
+
+    miner = RepositoryMining(repo_path, since=datetime(2019, 10, 1, 0, 0, 0))
     iterable = miner.traverse_commits()
 
     commits = []
-    for commit in iterable:
+
+    for i, commit in enumerate(iterable):
         data = process_commit(commit)
 
+        if (i % LOG_INTERVAL) == 0:
+            logger.info(f"... {i} commits processed ({len(commits)} records extracted)")
+
         if len(data["vul_ids"]):
+            # at this point, we don't need to keep every single line that changed
+            # we already know which vul ids are mentioned
             del data["modifications"]
+
             commits.extend(invert_refs(data))
 
     return commits_to_df(commits)
@@ -136,6 +176,9 @@ def process_repo(repo_path):
 def main():
 
     df = process_repo(repo)
+    logger.info("Done")
+
+    # keep only the first time a reference / file path pair appear
     df.sort_values(by="author_date", ascending=True, inplace=True)
     df.drop_duplicates(subset=["reference", "fpath"], keep="first", inplace=True)
 
