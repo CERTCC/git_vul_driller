@@ -10,6 +10,10 @@ from git_repo_crawler.patterns import PATTERN, normalize
 import pandas as pd
 import logging
 import git
+import os
+import yaml
+import argparse
+
 
 # set up logging
 logger = logging.getLogger(__name__)
@@ -28,7 +32,11 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
+# how many commits to process before logging?
 LOG_INTERVAL = 200
+
+# how many records to construct before dumping data out?
+DUMP_INTERVAL = 200
 
 # how often to refresh the git repo, in seconds
 REFRESH_AFTER_SECONDS = 3600 * 4
@@ -81,7 +89,7 @@ def find_vul_ids(commit_data):
     # check in msg
     for m in PATTERN.findall(c["msg"]):
         m = normalize(m)
-        rec = (m, None)
+        rec = (m, "COMMIT_MSG")
         matches.add(rec)
 
     # check in adds
@@ -106,13 +114,22 @@ def find_vul_ids(commit_data):
 
 def process_commit(commit):
     logger.debug(f"processing commit: {commit.hash}")
+
     commit_data = {k: getattr(commit, k, None) for k in commit_fields}
+
+    commit_data["data_source"] = "metasploit_git"
 
     commit_data["modifications"] = [
         process_modifications(m) for m in commit_data["modifications"]
     ]
 
     commit_data["vul_ids"] = list(find_vul_ids(commit_data))
+
+    # truncate commit messages
+    # slice at first newline
+    commit_data["msg"] = commit_data["msg"].split("\n")[0]
+    # truncate to 80 char max
+    commit_data["msg"] = commit_data["msg"][:80]
 
     # bring developer data to the surface
     for f in ["author", "committer"]:
@@ -140,7 +157,7 @@ def invert_refs(record):
 
 
 def commits_to_df(commits):
-    logger.info("creating dataframe")
+    logger.debug("creating dataframe")
     df = pd.DataFrame(commits)
     df["author_date"] = pd.to_datetime(df["author_date"], utc=True)
     df["committer_date"] = pd.to_datetime(df["committer_date"], utc=True)
@@ -160,58 +177,134 @@ def pull_repo(repo_path):
     if time_since < REFRESH_AFTER_SECONDS:
         # not time to refresh yet
         logger.debug(
-            f"Skipping refresh ({time_since} of {REFRESH_AFTER_SECONDS} elapsed)"
+            f"Skipping pull ({time_since:.0f} of {REFRESH_AFTER_SECONDS} elapsed)"
         )
         return
 
-    logger.info(f"Pulling {repo_path} from origin")
+    logger.info(f"Pulling {repo_path} from origin ({time_since:.0f} last refresh)")
     # if you got here, it's time to refresh
     o = repo.remotes.origin
     o.pull()
 
 
+def dump_csv(commits, csv_file):
+    logger.info(f"writing data to {csv_file}")
+    df = commits_to_df(commits)
+    df.to_csv(path_or_buf=csv_file, index=False)
+    return df
+
+
 def process_repo(repo_path):
-    pull_repo(repo_path)
 
     logger.info(f"Processing repo {repo_path}")
 
-    miner = RepositoryMining(repo_path, since=datetime(2019, 10, 1, 0, 0, 0))
+    miner = RepositoryMining(repo_path, since=datetime(2018, 1, 1, 0, 0, 0))
     iterable = miner.traverse_commits()
 
     commits = []
+    _df = None
+    record_count = 0
 
     for i, commit in enumerate(iterable):
         data = process_commit(commit)
 
         if (i % LOG_INTERVAL) == 0:
-            logger.info(f"... {i} commits processed ({len(commits)} records extracted)")
+            logger.info(f"... {i} commits processed ({record_count} records extracted)")
 
         if len(data["vul_ids"]):
             # at this point, we don't need to keep every single line that changed
             # we already know which vul ids are mentioned
             del data["modifications"]
 
-            commits.extend(invert_refs(data))
+            new_commit_records = invert_refs(data)
+            record_count += len(new_commit_records)
+            commits.extend(new_commit_records)
 
-    return commits_to_df(commits)
+        if len(commits) >= DUMP_INTERVAL:
+            csv_file = f"../output/vul_sightings_{commit.hash}.csv"
+            df = dump_csv(commits, csv_file)
+            commits = []
+
+    if _df is None:
+        _df = df
+    else:
+        _df = _df.append(df)
+
+    return df
+
+
+def _read_config(cfg_path):
+    logger.debug(f"Reading config from {cfg_path}")
+    with open(cfg_path, "r") as fp:
+        cfg = yaml.safe_load(fp)
+
+    cfg["work_path"] = os.path.abspath(os.path.expanduser(cfg["work_path"]))
+    cfg["repo_path"] = os.path.join(cfg["work_path"], cfg["repo_path"])
+
+    for k, v in cfg.items():
+        logger.debug(f"... {k} = {v}")
+
+    return cfg
+
+
+def _parse_args():
+    logger.debug("Parsing command line args")
+    parser = argparse.ArgumentParser(
+        description="Extract vulnerability IDs out of Metasploit Framework"
+    )
+    parser.add_argument(
+        "--config",
+        dest="cfgpath",
+        action="store",
+        type=str,
+        default="../config.yaml",
+        help="path to config.yaml",
+    )
+
+    args = parser.parse_args()
+
+    for k, v in vars(args).items():
+        logger.debug(f"... {k}: {v}")
+    return args
 
 
 def main():
+    # parse args
+    args = _parse_args()
 
-    df = process_repo(repo)
+    # read config
+    cfg = _read_config(args.cfgpath)
+
+    # make data dir if needed
+    os.makedirs(cfg["work_path"], exist_ok=True)
+
+    # clone or refresh repo
+    clone_or_pull_repo(cfg)
+
+    # process repo
+    df = process_repo(cfg["repo_path"])
+
     logger.info("Done")
 
     # keep only the first time a reference / file path pair appear
     df.sort_values(by="author_date", ascending=True, inplace=True)
     df.drop_duplicates(subset=["reference", "fpath"], keep="first", inplace=True)
 
-    print(f"Found {len(df)} commits")
-
     pd.set_option("display.width", 200)
     pd.set_option("display.max_columns", 10)
 
     cve_rows = df[df["reference"].apply(lambda x: x.lower().startswith("cve-"))]
     print(cve_rows)
+
+
+def clone_or_pull_repo(cfg):
+    if not os.path.exists(cfg["repo_path"]):
+        logger.info(f"No repo found at {cfg['repo_path']}")
+        logger.info(f"Cloning from {cfg['clone_url']}")
+
+        git.Repo.clone_from(url=cfg["clone_url"], to_path=cfg["repo_path"])
+    else:
+        pull_repo(cfg["repo_path"])
 
 
 if __name__ == "__main__":
