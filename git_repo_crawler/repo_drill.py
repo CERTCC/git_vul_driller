@@ -36,7 +36,7 @@ logger.addHandler(ch)
 LOG_INTERVAL = 200
 
 # how many records to construct before dumping data out?
-DUMP_INTERVAL = 200
+DUMP_INTERVAL = 500
 
 # how often to refresh the git repo, in seconds
 REFRESH_AFTER_SECONDS = 3600 * 4
@@ -194,11 +194,13 @@ def dump_csv(commits, csv_file):
     return df
 
 
-def process_repo(repo_path):
+def process_repo(repo_path, output_path):
 
-    logger.info(f"Processing repo {repo_path}")
+    repo = git.Repo(repo_path)
+    count = repo.git.rev_list("--count", "HEAD")
+    logger.info(f"Processing {count} commits in repo {repo_path}")
 
-    miner = RepositoryMining(repo_path, since=datetime(2018, 1, 1, 0, 0, 0))
+    miner = RepositoryMining(repo_path)
     iterable = miner.traverse_commits()
 
     commits = []
@@ -209,7 +211,9 @@ def process_repo(repo_path):
         data = process_commit(commit)
 
         if (i % LOG_INTERVAL) == 0:
-            logger.info(f"... {i} commits processed ({record_count} records extracted)")
+            logger.info(
+                f"... {i}/{count} commits processed ({record_count} records extracted)"
+            )
 
         if len(data["vul_ids"]):
             # at this point, we don't need to keep every single line that changed
@@ -221,15 +225,27 @@ def process_repo(repo_path):
             commits.extend(new_commit_records)
 
         if len(commits) >= DUMP_INTERVAL:
-            csv_file = f"../output/vul_sightings_{commit.hash}.csv"
-            df = dump_csv(commits, csv_file)
+            df = dump_csv_2(commit.hash, commits, output_path)
+            if _df is None:
+                _df = df
+            else:
+                _df = _df.append(df)
             commits = []
 
+    # get the last batch
+    df = dump_csv_2(commit.hash, commits, output_path)
     if _df is None:
         _df = df
     else:
         _df = _df.append(df)
 
+    return _df
+
+
+def dump_csv_2(c_hash, commits, output_path):
+    fname = f"vul_sightings_{c_hash}.csv"
+    csv_file = os.path.join(output_path, fname)
+    df = dump_csv(commits, csv_file)
     return df
 
 
@@ -275,14 +291,15 @@ def main():
     # read config
     cfg = _read_config(args.cfgpath)
 
-    # make data dir if needed
+    # make data and output dirs if needed
     os.makedirs(cfg["work_path"], exist_ok=True)
+    os.makedirs(cfg["output_path"], exist_ok=True)
 
     # clone or refresh repo
     clone_or_pull_repo(cfg)
 
     # process repo
-    df = process_repo(cfg["repo_path"])
+    df = process_repo(cfg["repo_path"], cfg["output_path"])
 
     logger.info("Done")
 
