@@ -165,8 +165,15 @@ def commits_to_df(commits):
     return df
 
 
-def pull_repo(repo_path):
+def pull_repo(repo_path, clone_url):
     repo = git.Repo(repo_path)
+
+    try:
+        origin = repo.remotes.origin
+    except AttributeError as e:
+        origin = repo.create_remote(name="origin", url=clone_url)
+
+    repo.heads.master.set_tracking_branch(origin.refs.master)
 
     # see if it's time to refresh yet
     commit = repo.head.commit
@@ -183,8 +190,7 @@ def pull_repo(repo_path):
 
     logger.info(f"Pulling {repo_path} from origin ({time_since:.0f} last refresh)")
     # if you got here, it's time to refresh
-    o = repo.remotes.origin
-    o.pull()
+    origin.pull()
 
 
 def dump_csv(commits, csv_file):
@@ -284,6 +290,49 @@ def _parse_args():
     return args
 
 
+def _commit_handler(commit_hash=None, repo_path=None):
+    # create a one-shot repository miner for this commit
+    try:
+        rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
+    except OSError as e:
+        PID = os.getpid()
+        print(f"A: {PID} {e}")
+        raise
+
+    # RM uses GitPython, and GitPython wants to use a config file lock in case we are going to make changes
+    # But in our case we know we're not. So we have to add some extra handling to get rid of the file locks
+    # in order to proceed.
+    while True:
+        try:
+            # although this is a for loop, we only get a single commit out of it
+            for commit in rm.traverse_commits():
+                data = process_commit(commit)
+            break
+        except OSError as e:
+            # print(f"B: {PID} {e}")
+            lockfile = os.path.join(repo_path, ".git/config.lock")
+            try:
+                os.remove(lockfile)
+            except OSError as e:
+                pass
+                # print(f"Caught OSError: {e}")
+
+    return data
+
+
+def _dh(data):
+    refined = []
+    if len(data["vul_ids"]):
+        # at this point, we don't need to keep every single line that changed
+        # we already know which vul ids are mentioned
+        del data["modifications"]
+
+        new_data = invert_refs(data)
+        refined.extend(new_data)
+
+    return refined
+
+
 def main():
     # parse args
     args = _parse_args()
@@ -297,6 +346,35 @@ def main():
 
     # clone or refresh repo
     clone_or_pull_repo(cfg)
+
+    # get list of commits
+    repo = git.Repo(cfg["repo_path"])
+    commit_hashes = [c.hexsha for c in repo.iter_commits()]
+
+    from functools import partial
+
+    _ch = partial(_commit_handler, repo_path=cfg["repo_path"])
+
+    import multiprocessing as mp
+
+    pool = mp.Pool()
+    commit_data = pool.imap_unordered(func=_ch, iterable=commit_hashes, chunksize=20)
+
+    results2 = pool.imap_unordered(func=_dh, iterable=commit_data)
+
+    # from pprint import pprint
+
+    data = []
+    for r in results2:
+        data.extend(r)
+
+    # pprint(data)
+
+    ch = repo.head.commit.hexsha
+
+    dump_csv_2(ch, commits=data, output_path=cfg["output_path"])
+
+    exit()
 
     # process repo
     df = process_repo(cfg["repo_path"], cfg["output_path"])
@@ -321,7 +399,7 @@ def clone_or_pull_repo(cfg):
 
         git.Repo.clone_from(url=cfg["clone_url"], to_path=cfg["repo_path"])
     else:
-        pull_repo(cfg["repo_path"])
+        pull_repo(cfg["repo_path"], cfg["clone_url"])
 
 
 if __name__ == "__main__":
