@@ -73,6 +73,14 @@ def main():
     data = read_mstp_json(mtsp_json)
     df = mtsp_to_df(data)
 
+    df.to_json(
+        path_or_buf="../output/vul_sightings_metasploit_metadata_base.json",
+        orient="table",
+        date_format="iso",
+        date_unit="s",
+        indent=2,
+    )
+
     logger.debug(df.__str__())
 
     cve_rows = df[df["reference"].apply(lambda x: x.lower().startswith("cve-"))]
@@ -108,6 +116,8 @@ def mtsp_to_df(data):
         max -= 1
     df = pd.DataFrame(rows)
 
+    # eliminate extra whitespace
+    df["description"] = df["description"].apply(lambda x: " ".join(x.split()))
     df["mod_time"] = pd.to_datetime(df["mod_time"])
     df["disclosure_date"] = pd.to_datetime(df["disclosure_date"])
     df["source"] = "metasploit_framework_db"

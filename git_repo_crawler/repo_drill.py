@@ -4,16 +4,18 @@ file: repo_drill
 author: adh
 created_at: 3/27/20 11:45 AM
 """
-from pydriller import RepositoryMining, GitRepository
+from pydriller import RepositoryMining
 from datetime import datetime
+
+from git_repo_crawler.config import _read_config
 from git_repo_crawler.patterns import PATTERN, normalize
 import pandas as pd
 import logging
 import git
 import os
-import yaml
 import argparse
-
+from functools import partial
+import multiprocessing as mp
 
 # set up logging
 logger = logging.getLogger(__name__)
@@ -193,80 +195,31 @@ def pull_repo(repo_path, clone_url):
     origin.pull()
 
 
-def dump_csv(commits, csv_file):
-    logger.info(f"writing data to {csv_file}")
+def dump_csv_2(c_hash, commits, output_path):
+
+    fname_base = f"vul_sightings_{c_hash}"
+    csv_fname = f"{fname_base}.csv"
+    json_fname = f"{fname_base}.json"
+
+    csv_file = os.path.join(output_path, csv_fname)
+    json_file = os.path.join(output_path, json_fname)
+
+    logger.info("Create dataframe from commits")
     df = commits_to_df(commits)
+
+    logger.info(f"Write to {json_file}")
+    df.to_json(
+        path_or_buf=json_file,
+        orient="table",
+        date_format="iso",
+        date_unit="s",
+        # lines=True,
+        indent=2,
+    )
+
+    logger.info(f"Write to {csv_file}")
     df.to_csv(path_or_buf=csv_file, index=False)
     return df
-
-
-def process_repo(repo_path, output_path):
-
-    repo = git.Repo(repo_path)
-    count = repo.git.rev_list("--count", "HEAD")
-    logger.info(f"Processing {count} commits in repo {repo_path}")
-
-    miner = RepositoryMining(repo_path)
-    iterable = miner.traverse_commits()
-
-    commits = []
-    _df = None
-    record_count = 0
-
-    for i, commit in enumerate(iterable):
-        data = process_commit(commit)
-
-        if (i % LOG_INTERVAL) == 0:
-            logger.info(
-                f"... {i}/{count} commits processed ({record_count} records extracted)"
-            )
-
-        if len(data["vul_ids"]):
-            # at this point, we don't need to keep every single line that changed
-            # we already know which vul ids are mentioned
-            del data["modifications"]
-
-            new_commit_records = invert_refs(data)
-            record_count += len(new_commit_records)
-            commits.extend(new_commit_records)
-
-        if len(commits) >= DUMP_INTERVAL:
-            df = dump_csv_2(commit.hash, commits, output_path)
-            if _df is None:
-                _df = df
-            else:
-                _df = _df.append(df)
-            commits = []
-
-    # get the last batch
-    df = dump_csv_2(commit.hash, commits, output_path)
-    if _df is None:
-        _df = df
-    else:
-        _df = _df.append(df)
-
-    return _df
-
-
-def dump_csv_2(c_hash, commits, output_path):
-    fname = f"vul_sightings_{c_hash}.csv"
-    csv_file = os.path.join(output_path, fname)
-    df = dump_csv(commits, csv_file)
-    return df
-
-
-def _read_config(cfg_path):
-    logger.debug(f"Reading config from {cfg_path}")
-    with open(cfg_path, "r") as fp:
-        cfg = yaml.safe_load(fp)
-
-    cfg["work_path"] = os.path.abspath(os.path.expanduser(cfg["work_path"]))
-    cfg["repo_path"] = os.path.join(cfg["work_path"], cfg["repo_path"])
-
-    for k, v in cfg.items():
-        logger.debug(f"... {k} = {v}")
-
-    return cfg
 
 
 def _parse_args():
@@ -340,6 +293,7 @@ def main():
     # read config
     cfg = _read_config(args.cfgpath)
 
+    logger.info("Create data and output dirs if needed")
     # make data and output dirs if needed
     os.makedirs(cfg["work_path"], exist_ok=True)
     os.makedirs(cfg["output_path"], exist_ok=True)
@@ -348,48 +302,32 @@ def main():
     clone_or_pull_repo(cfg)
 
     # get list of commits
-    repo = git.Repo(cfg["repo_path"])
-    commit_hashes = [c.hexsha for c in repo.iter_commits()]
+    logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
+    ch, commit_hashes = get_commit_hashes_from_repo(cfg["repo_path"])
 
-    from functools import partial
+    commit_handler = partial(_commit_handler, repo_path=cfg["repo_path"])
 
-    _ch = partial(_commit_handler, repo_path=cfg["repo_path"])
-
-    import multiprocessing as mp
-
+    logger.info(f"Processing commits...")
     pool = mp.Pool()
-    commit_data = pool.imap_unordered(func=_ch, iterable=commit_hashes, chunksize=20)
-
+    commit_data = pool.imap_unordered(
+        func=commit_handler, iterable=commit_hashes[:100], chunksize=20
+    )
     results2 = pool.imap_unordered(func=_dh, iterable=commit_data)
-
-    # from pprint import pprint
 
     data = []
     for r in results2:
         data.extend(r)
 
-    # pprint(data)
-
-    ch = repo.head.commit.hexsha
-
+    logger.info("Dumping data to CSV")
     dump_csv_2(ch, commits=data, output_path=cfg["output_path"])
-
-    exit()
-
-    # process repo
-    df = process_repo(cfg["repo_path"], cfg["output_path"])
-
     logger.info("Done")
 
-    # keep only the first time a reference / file path pair appear
-    df.sort_values(by="author_date", ascending=True, inplace=True)
-    df.drop_duplicates(subset=["reference", "fpath"], keep="first", inplace=True)
 
-    pd.set_option("display.width", 200)
-    pd.set_option("display.max_columns", 10)
-
-    cve_rows = df[df["reference"].apply(lambda x: x.lower().startswith("cve-"))]
-    print(cve_rows)
+def get_commit_hashes_from_repo(repo_path):
+    repo = git.Repo(repo_path)
+    commit_hashes = [c.hexsha for c in repo.iter_commits()]
+    head_commit_hash = repo.head.commit.hexsha
+    return head_commit_hash, commit_hashes
 
 
 def clone_or_pull_repo(cfg):
