@@ -4,32 +4,16 @@ file: demo.py
 author: adh
 created_at: 3/27/20 8:19 AM
 """
-import yaml
-import os
-from glob import glob
 from git_repo_crawler.config import _read_config
 import logging
 import pandas as pd
+
+from git_repo_crawler.data_handler import read_json
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 hdlr = logging.StreamHandler()
 logger.addHandler(hdlr)
-
-
-def read_json(output_path):
-    logger.debug(f"Looking for json files in {output_path}")
-    jsonfiles = glob(os.path.join(output_path, "vul_sightings_*.json"))
-
-    dataframes = []
-    for f in jsonfiles:
-        logger.debug(f"Found file {f}")
-        _df = pd.read_json(f, orient="table")
-
-        dataframes.append(_df)
-
-    df = pd.concat(dataframes)
-    return df
 
 
 def clean_data(df):

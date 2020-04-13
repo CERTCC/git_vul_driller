@@ -8,6 +8,7 @@ from pydriller import RepositoryMining
 from datetime import datetime
 
 from git_repo_crawler.config import _read_config
+from git_repo_crawler.data_handler import dump_json, dump_csv
 from git_repo_crawler.patterns import PATTERN, normalize
 import pandas as pd
 import logging
@@ -195,33 +196,6 @@ def pull_repo(repo_path, clone_url):
     origin.pull()
 
 
-def dump_csv_2(c_hash, commits, output_path):
-
-    fname_base = f"vul_sightings_{c_hash}"
-    csv_fname = f"{fname_base}.csv"
-    json_fname = f"{fname_base}.json"
-
-    csv_file = os.path.join(output_path, csv_fname)
-    json_file = os.path.join(output_path, json_fname)
-
-    logger.info("Create dataframe from commits")
-    df = commits_to_df(commits)
-
-    logger.info(f"Write to {json_file}")
-    df.to_json(
-        path_or_buf=json_file,
-        orient="table",
-        date_format="iso",
-        date_unit="s",
-        # lines=True,
-        indent=2,
-    )
-
-    logger.info(f"Write to {csv_file}")
-    df.to_csv(path_or_buf=csv_file, index=False)
-    return df
-
-
 def _parse_args():
     logger.debug("Parsing command line args")
     parser = argparse.ArgumentParser(
@@ -318,8 +292,15 @@ def main():
     for r in results2:
         data.extend(r)
 
+    logger.info("Create dataframe from commits")
+    df = commits_to_df(data)
+
+    logger.info("Dumping data to JSON")
+    dump_json(ch, df=df, output_path=cfg["output_path"])
+
     logger.info("Dumping data to CSV")
-    dump_csv_2(ch, commits=data, output_path=cfg["output_path"])
+    dump_csv(ch, df=df, output_path=cfg["output_path"])
+
     logger.info("Done")
 
 
