@@ -128,11 +128,14 @@ def process_commit(commit):
 
     commit_data["vul_ids"] = list(find_vul_ids(commit_data))
 
+    commit_data["parents"] = "|".join(commit_data["parents"])
+    commit_data["branches"] = "|".join(commit_data["branches"])
+
     # truncate commit messages
     # slice at first newline
-    commit_data["msg"] = commit_data["msg"].split("\n")[0]
+    # commit_data["msg"] = commit_data["msg"].split("\n")[0]
     # truncate to 80 char max
-    commit_data["msg"] = commit_data["msg"][:80]
+    # commit_data["msg"] = commit_data["msg"][:80]å
 
     # bring developer data to the surface
     for f in ["author", "committer"]:
