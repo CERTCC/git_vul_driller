@@ -74,7 +74,7 @@ def main():
     df = mtsp_to_df(data)
 
     df.to_json(
-        path_or_buf="../output/vul_sightings_metasploit_metadata_base.json",
+        path_or_buf="../output/vul_mentions_metasploit_metadata_base.json",
         orient="table",
         date_format="iso",
         date_unit="s",
