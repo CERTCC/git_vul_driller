@@ -14,7 +14,13 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-def read_json(output_path):
+def read_json(jsonfile):
+    with open(jsonfile, "r") as fp:
+        data = json.load(fp)
+    return data
+
+
+def read_multi_json(output_path):
     logger.debug(f"Looking for json files in {output_path}")
     jsonfiles = glob(os.path.join(output_path, "vul_sightings_*.json"))
 
@@ -32,11 +38,7 @@ def read_json(output_path):
     return df
 
 
-def dump_json(c_hash, df, output_path):
-    fname_base = f"vul_sightings_{c_hash}"
-
-    json_fname = f"{fname_base}.json"
-    json_file = os.path.join(output_path, json_fname)
+def dump_json(df, json_file):
 
     logger.info(f"Write to {json_file}")
     df.to_json(

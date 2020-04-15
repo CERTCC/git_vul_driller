@@ -7,7 +7,7 @@ created_at: 3/27/20 11:45 AM
 from pydriller import RepositoryMining
 from datetime import datetime
 
-from git_repo_crawler.config import _read_config
+from git_repo_crawler.config import read_config
 from git_repo_crawler.data_handler import dump_json, dump_csv
 from git_repo_crawler.patterns import PATTERN, normalize
 import pandas as pd
@@ -71,8 +71,6 @@ modification_fields = [
     "removed",
 ]
 
-repo = "../data/metasploit-framework"
-
 
 def process_modifications(mod):
     mod_data = {k: getattr(mod, k, None) for k in modification_fields}
@@ -127,15 +125,6 @@ def process_commit(commit):
     ]
 
     commit_data["vul_ids"] = list(find_vul_ids(commit_data))
-
-    commit_data["parents"] = "|".join(commit_data["parents"])
-    commit_data["branches"] = "|".join(commit_data["branches"])
-
-    # truncate commit messages
-    # slice at first newline
-    # commit_data["msg"] = commit_data["msg"].split("\n")[0]
-    # truncate to 80 char max
-    # commit_data["msg"] = commit_data["msg"][:80]å
 
     # bring developer data to the surface
     for f in ["author", "committer"]:
@@ -226,12 +215,12 @@ def _commit_handler(commit_hash=None, repo_path=None):
         rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
     except OSError as e:
         PID = os.getpid()
-        print(f"A: {PID} {e}")
+        logger.error(f"{PID} {e}")
         raise
 
     # RM uses GitPython, and GitPython wants to use a config file lock in case we are going to make changes
     # But in our case we know we're not. So we have to add some extra handling to get rid of the file locks
-    # in order to proceed.
+    # in order to proceed. Yes, there is an inherent race condition here, but in practical terms it eventually works.
     while True:
         try:
             # although this is a for loop, we only get a single commit out of it
@@ -239,7 +228,7 @@ def _commit_handler(commit_hash=None, repo_path=None):
                 data = process_commit(commit)
             break
         except OSError as e:
-            # print(f"B: {PID} {e}")
+            # when GitPython can't get a config file lock, it throws an OSError
             lockfile = os.path.join(repo_path, ".git/config.lock")
             try:
                 os.remove(lockfile)
@@ -268,7 +257,7 @@ def main():
     args = _parse_args()
 
     # read config
-    cfg = _read_config(args.cfgpath)
+    cfg = read_config(args.cfgpath)
 
     logger.info("Create data and output dirs if needed")
     # make data and output dirs if needed
@@ -284,10 +273,10 @@ def main():
 
     commit_handler = partial(_commit_handler, repo_path=cfg["repo_path"])
 
-    logger.info(f"Processing commits...")
+    logger.info(f"Processing {len(commit_hashes)} commits...")
     pool = mp.Pool()
     commit_data = pool.imap_unordered(
-        func=commit_handler, iterable=commit_hashes[:100], chunksize=20
+        func=commit_handler, iterable=commit_hashes, chunksize=20
     )
     results2 = pool.imap_unordered(func=_dh, iterable=commit_data)
 
@@ -298,11 +287,12 @@ def main():
     logger.info("Create dataframe from commits")
     df = commits_to_df(data)
 
-    logger.info("Dumping data to JSON")
-    dump_json(ch, df=df, output_path=cfg["output_path"])
+    fname_base = "vul_sightings"
+    json_fname = f"{fname_base}_{ch}.json"
+    json_file = os.path.join(cfg["output_path"], json_fname)
 
-    logger.info("Dumping data to CSV")
-    dump_csv(ch, df=df, output_path=cfg["output_path"])
+    logger.info("Dumping data to JSON")
+    dump_json(df, json_file)
 
     logger.info("Done")
 

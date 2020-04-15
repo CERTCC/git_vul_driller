@@ -4,11 +4,11 @@ file: demo.py
 author: adh
 created_at: 3/27/20 8:19 AM
 """
-from git_repo_crawler.config import _read_config
+from git_repo_crawler.config import read_config
 import logging
 import pandas as pd
 
-from git_repo_crawler.data_handler import read_json
+from git_repo_crawler.data_handler import read_multi_json
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -24,13 +24,16 @@ def clean_data(df):
         "author_date",
         "committer_date",
     ]
+
+    logger.debug("Converting date rows to timestamps")
     for dc in date_cols:
         _df[dc] = pd.to_datetime(_df[dc])
 
-    # sort by date
+    logger.debug("Sort records by date")
     _df = _df.sort_values(by="author_date", ascending=True)
 
     # remove duplicates, keep first (which should be the earliest given the sort we just did)
+    logger.debug("Deduplicate records")
     _df = _df.drop_duplicates(subset="reference", keep="first")
 
     return _df
@@ -44,10 +47,10 @@ def cve_only(df):
 
 def main(cfg_path):
     logger.info(f"Read config from {cfg_path}")
-    cfg = _read_config(cfg_path)
+    cfg = read_config(cfg_path)
 
     logger.info(f"Reading in data...")
-    df = read_json(cfg["output_path"])
+    df = read_multi_json(cfg["output_path"])
 
     logger.info(f"Read {len(df)} rows from CSV files")
     logger.debug("Columns:")
