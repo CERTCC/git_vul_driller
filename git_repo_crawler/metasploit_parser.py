@@ -30,6 +30,17 @@ _max_logged_records = 20
 _done_logging = False
 
 
+def find_pattern_matches(str_, pattern, normalizer=None):
+    matches = set()
+
+    for m in pattern.findall(str_):
+        if normalizer is not None:
+            m = normalizer(m)
+        matches.add(m)
+
+    return list(matches)
+
+
 def extract_record(key, record):
     global _logged_record_count
     global _done_logging
@@ -61,8 +72,14 @@ def extract_record(key, record):
 
 
 def invert_refs(record):
-    refs = record.get("references")
     fields = [k for k in record.keys() if k != "references"]
+
+    refs = []
+    for ref in record.get("references"):
+        refs.append(ref)
+
+        matches = find_pattern_matches(ref, pattern=PATTERN, normalizer=normalize)
+        refs.extend(matches)
 
     inverted = []
     for ref in refs:
