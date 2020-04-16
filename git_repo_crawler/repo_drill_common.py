@@ -1,49 +1,34 @@
 #!/usr/bin/env python
 """
-file: repo_drill
+file: repo_drill_common
 author: adh
-created_at: 3/27/20 11:45 AM
+created_at: 4/16/20 9:29 AM
 """
-from pydriller import RepositoryMining
+import multiprocessing as mp
+import os
 from datetime import datetime
 
-from git_repo_crawler.config import read_config
-from git_repo_crawler.data_handler import dump_json, dump_csv
-from git_repo_crawler.patterns import PATTERN, normalize
-import pandas as pd
-import logging
 import git
-import os
-import argparse
-from functools import partial
-import multiprocessing as mp
+import pandas as pd
+from pydriller import RepositoryMining
 
-# set up logging
+from git_repo_crawler.patterns import PATTERN, normalize
+import logging
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-# create file handler which logs even debug messages
-fh = logging.FileHandler(filename="../log/repo_drill.log", mode="w")
-fh.setLevel(logging.DEBUG)
-# create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-# create formatter and add it to the handlers
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-fh.setFormatter(formatter)
-ch.setFormatter(formatter)
-# add the handlers to the logger
-logger.addHandler(fh)
-logger.addHandler(ch)
 
-# how many commits to process before logging?
+
+def main():
+    pass
+
+
+if __name__ == "__main__":
+    main()
+lock = mp.Lock()
 LOG_INTERVAL = 200
-
-# how many records to construct before dumping data out?
 DUMP_INTERVAL = 500
-
-# how often to refresh the git repo, in seconds
 REFRESH_AFTER_SECONDS = 3600 * 4
-
 commit_fields = [
     "hash",
     "msg",
@@ -61,7 +46,6 @@ commit_fields = [
     "project_name",
     "project_path",
 ]
-
 modification_fields = [
     "old_path",
     "new_path",
@@ -118,7 +102,7 @@ def process_commit(commit):
 
     commit_data = {k: getattr(commit, k, None) for k in commit_fields}
 
-    commit_data["data_source"] = "metasploit_git"
+    commit_data["data_source"] = "exploitdb_git"
 
     commit_data["modifications"] = [
         process_modifications(m) for m in commit_data["modifications"]
@@ -188,54 +172,27 @@ def pull_repo(repo_path, clone_url):
     origin.pull()
 
 
-def _parse_args():
-    logger.debug("Parsing command line args")
-    parser = argparse.ArgumentParser(
-        description="Extract vulnerability IDs out of Metasploit Framework"
-    )
-    parser.add_argument(
-        "--config",
-        dest="cfgpath",
-        action="store",
-        type=str,
-        default="../config.yaml",
-        help="path to config.yaml",
-    )
-
-    args = parser.parse_args()
-
-    for k, v in vars(args).items():
-        logger.debug(f"... {k}: {v}")
-    return args
-
-
 def _commit_handler(commit_hash=None, repo_path=None):
-    # create a one-shot repository miner for this commit
-    try:
+    # RepositoryMining uses a pydriller.GitRepository object.
+    # in turn that GitRepository object attempts to set a file based
+    # config.lock on the .git/config file in the repository when the
+    # object is initialized. When running this function in a parallel process, we
+    # run into a problem where all the processes are trying to create that lock at
+    # the same time. So we need to use our own multiprocessing.Lock here to avoid
+    # the locking failure.
+    with lock:
         rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
-    except OSError as e:
-        PID = os.getpid()
-        logger.error(f"{PID} {e}")
-        raise
+        # we're doing a single commit, but traverse_commits is still a generator
+        # so this for loop is just a formality
+        commit = None
+        for _commit in rm.traverse_commits():
+            commit = _commit
 
-    # RM uses GitPython, and GitPython wants to use a config file lock in case we are going to make changes
-    # But in our case we know we're not. So we have to add some extra handling to get rid of the file locks
-    # in order to proceed. Yes, there is an inherent race condition here, but in practical terms it eventually works.
-    while True:
-        try:
-            # although this is a for loop, we only get a single commit out of it
-            for commit in rm.traverse_commits():
-                data = process_commit(commit)
-            break
-        except OSError as e:
-            # when GitPython can't get a config file lock, it throws an OSError
-            lockfile = os.path.join(repo_path, ".git/config.lock")
-            try:
-                os.remove(lockfile)
-            except OSError as e:
-                pass
-                # print(f"Caught OSError: {e}")
+    assert commit is not None
 
+    # we only need the lock while we're using the repository miner. Once we have
+    # our commit we can go back to full parallel operation.
+    data = process_commit(commit)
     return data
 
 
@@ -250,51 +207,6 @@ def _dh(data):
         refined.extend(new_data)
 
     return refined
-
-
-def main():
-    # parse args
-    args = _parse_args()
-
-    # read config
-    cfg = read_config(args.cfgpath)
-
-    logger.info("Create data and output dirs if needed")
-    # make data and output dirs if needed
-    os.makedirs(cfg["work_path"], exist_ok=True)
-    os.makedirs(cfg["output_path"], exist_ok=True)
-
-    # clone or refresh repo
-    clone_or_pull_repo(cfg)
-
-    # get list of commits
-    logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
-    ch, commit_hashes = get_commit_hashes_from_repo(cfg["repo_path"])
-
-    commit_handler = partial(_commit_handler, repo_path=cfg["repo_path"])
-
-    logger.info(f"Processing {len(commit_hashes)} commits...")
-    pool = mp.Pool()
-    commit_data = pool.imap_unordered(
-        func=commit_handler, iterable=commit_hashes, chunksize=20
-    )
-    results2 = pool.imap_unordered(func=_dh, iterable=commit_data)
-
-    data = []
-    for r in results2:
-        data.extend(r)
-
-    logger.info("Create dataframe from commits")
-    df = commits_to_df(data)
-
-    fname_base = "vul_sightings"
-    json_fname = f"{fname_base}_{ch}.json"
-    json_file = os.path.join(cfg["output_path"], json_fname)
-
-    logger.info("Dumping data to JSON")
-    dump_json(df, json_file)
-
-    logger.info("Done")
 
 
 def get_commit_hashes_from_repo(repo_path):
@@ -312,7 +224,3 @@ def clone_or_pull_repo(cfg):
         git.Repo.clone_from(url=cfg["clone_url"], to_path=cfg["repo_path"])
     else:
         pull_repo(cfg["repo_path"], cfg["clone_url"])
-
-
-if __name__ == "__main__":
-    main()

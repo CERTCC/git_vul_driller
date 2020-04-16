@@ -4,11 +4,17 @@ file: repo_drill
 author: adh
 created_at: 3/27/20 11:45 AM
 """
-import argparse
+from pydriller import RepositoryMining
+from datetime import datetime
+
 from git_repo_crawler.config import read_config
-from git_repo_crawler.data_handler import dump_json
+from git_repo_crawler.data_handler import dump_json, dump_csv
+from git_repo_crawler.patterns import PATTERN, normalize
+import pandas as pd
 import logging
+import git
 import os
+import argparse
 from functools import partial
 import multiprocessing as mp
 from git_repo_crawler.repo_drill_common import (
@@ -19,12 +25,12 @@ from git_repo_crawler.repo_drill_common import (
     clone_or_pull_repo,
 )
 
-# set up logging
 
+# set up logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
-fh = logging.FileHandler(filename="../log/repo_drill_edb.log", mode="w")
+fh = logging.FileHandler(filename="../log/repo_drill.log", mode="w")
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
@@ -38,22 +44,17 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
-# how many commits to process before logging?
-
-# how many records to construct before dumping data out?
-
-# how often to refresh the git repo, in seconds
 def _parse_args():
     logger.debug("Parsing command line args")
     parser = argparse.ArgumentParser(
-        description="Extract vulnerability IDs out of ExploitDB"
+        description="Extract vulnerability IDs out of Metasploit Framework"
     )
     parser.add_argument(
         "--config",
         dest="cfgpath",
         action="store",
         type=str,
-        default="../config_edb.yaml",
+        default="../config.yaml",
         help="path to config.yaml",
     )
 
@@ -86,14 +87,10 @@ def main():
     commit_handler = partial(_commit_handler, repo_path=cfg["repo_path"])
 
     logger.info(f"Processing {len(commit_hashes)} commits...")
-
     pool = mp.Pool()
-    logger.info(f"Poolsize: {len(pool._pool)}")
-
     commit_data = pool.imap_unordered(
-        func=commit_handler, iterable=commit_hashes, chunksize=20,
+        func=commit_handler, iterable=commit_hashes, chunksize=20
     )
-
     results2 = pool.imap_unordered(func=_dh, iterable=commit_data)
 
     data = []
@@ -103,7 +100,7 @@ def main():
     logger.info("Create dataframe from commits")
     df = commits_to_df(data)
 
-    fname_base = "vul_sightings_edb"
+    fname_base = "vul_sightings"
     json_fname = f"{fname_base}_{ch}.json"
     json_file = os.path.join(cfg["output_path"], json_fname)
 
