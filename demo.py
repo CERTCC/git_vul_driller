@@ -76,4 +76,4 @@ def main(cfg_path):
 
 
 if __name__ == "__main__":
-    main("./config.yaml")
+    main("config_metasploit.yaml")

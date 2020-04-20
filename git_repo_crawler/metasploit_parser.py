@@ -99,8 +99,8 @@ def _parse_args():
         dest="cfgpath",
         action="store",
         type=str,
-        default="../config.yaml",
-        help="path to config.yaml",
+        default="../config_metasploit.yaml",
+        help="path to config_metasploit.yaml",
     )
 
     args = parser.parse_args()

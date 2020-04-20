@@ -8,25 +8,23 @@ import argparse
 import multiprocessing as mp
 import os
 from datetime import datetime
+from functools import partial
 
 import git
 import pandas as pd
 from pydriller import RepositoryMining
 
+from git_repo_crawler.config import read_config
+from git_repo_crawler.data_handler import dump_json
+
 from git_repo_crawler.patterns import PATTERN, normalize
 import logging
 
+# suppress pydriller's verbose logging
+logging.getLogger("pydriller.repository_mining").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-
-def main():
-    pass
-
-
-if __name__ == "__main__":
-    main()
 lock = mp.Lock()
 LOG_INTERVAL = 200
 DUMP_INTERVAL = 500
@@ -56,6 +54,16 @@ modification_fields = [
     "added",
     "removed",
 ]
+
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+
+def setup_file_logger(logfile):
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler(filename=logfile, mode="w")
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
 
 
 def process_modifications(mod):
@@ -218,14 +226,14 @@ def get_commit_hashes_from_repo(repo_path):
     return head_commit_hash, commit_hashes
 
 
-def clone_or_pull_repo(cfg):
-    if not os.path.exists(cfg["repo_path"]):
-        logger.info(f"No repo found at {cfg['repo_path']}")
-        logger.info(f"Cloning from {cfg['clone_url']}")
+def clone_or_pull_repo(repo_path, clone_url):
+    if not os.path.exists(repo_path):
+        logger.info(f"No repo found at {repo_path}")
+        logger.info(f"Cloning from {clone_url}")
 
-        git.Repo.clone_from(url=cfg["clone_url"], to_path=cfg["repo_path"])
+        git.Repo.clone_from(url=clone_url, to_path=repo_path)
     else:
-        pull_repo(cfg["repo_path"], cfg["clone_url"])
+        pull_repo(repo_path, clone_url)
 
 
 def parse_args(defaults):
@@ -239,7 +247,7 @@ def parse_args(defaults):
         action="store",
         type=str,
         default=defaults["cfgpath"],
-        help="path to config.yaml",
+        help="path to config_metasploit.yaml",
     )
 
     args = parser.parse_args()
@@ -247,3 +255,58 @@ def parse_args(defaults):
     for k, v in vars(args).items():
         logger.debug(f"... {k}: {v}")
     return args
+
+
+def main(defaults):
+    # parse args
+    args = parse_args(defaults)
+
+    # read config
+    cfg = read_config(args.cfgpath)
+
+    setup_file_logger(cfg["logfile"])
+
+    logger.info("Create data and output dirs if needed")
+    # make data and output dirs if needed
+    os.makedirs(cfg["work_path"], exist_ok=True)
+    os.makedirs(cfg["output_path"], exist_ok=True)
+
+    # clone or refresh repo
+    clone_or_pull_repo(cfg["repo_path"], cfg["clone_url"])
+
+    # get list of commits
+    logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
+    ch, commit_hashes = get_commit_hashes_from_repo(cfg["repo_path"])
+
+    _commit_handler = partial(commit_handler, repo_path=cfg["repo_path"])
+
+    logger.info(f"Processing {len(commit_hashes)} commits...")
+
+    pool = mp.Pool()
+    logger.info(f"Poolsize: {len(pool._pool)}")
+
+    commit_data = pool.imap_unordered(func=_commit_handler, iterable=commit_hashes)
+    results2 = pool.imap_unordered(func=dh, iterable=commit_data)
+
+    data = []
+    for r in results2:
+        data.extend(r)
+
+    logger.info("Create dataframe from commits")
+    df = commits_to_df(data)
+
+    if len(df) < 1:
+        logger.warning("DataFrame appears empty!")
+
+    fname_base = cfg["outfile_basename"]
+    json_fname = f"{fname_base}_{ch}.json"
+    json_file = os.path.join(cfg["output_path"], json_fname)
+
+    logger.info("Dumping data to JSON")
+    dump_json(df, json_file)
+
+    logger.info("Done")
+
+
+if __name__ == "__main__":
+    main()
