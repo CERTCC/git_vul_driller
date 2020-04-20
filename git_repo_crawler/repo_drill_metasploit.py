@@ -4,27 +4,24 @@ file: repo_drill
 author: adh
 created_at: 3/27/20 11:45 AM
 """
-from pydriller import RepositoryMining
-from datetime import datetime
-
 from git_repo_crawler.config import read_config
-from git_repo_crawler.data_handler import dump_json, dump_csv
-from git_repo_crawler.patterns import PATTERN, normalize
-import pandas as pd
+from git_repo_crawler.data_handler import dump_json
 import logging
-import git
 import os
-import argparse
 from functools import partial
 import multiprocessing as mp
 from git_repo_crawler.repo_drill_common import (
     commits_to_df,
-    _commit_handler,
-    _dh,
+    commit_handler,
+    dh,
     get_commit_hashes_from_repo,
     clone_or_pull_repo,
+    parse_args,
 )
 
+defaults = {
+    "cfgpath": "../config.yaml",
+}
 
 # set up logging
 logger = logging.getLogger(__name__)
@@ -44,30 +41,9 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
-def _parse_args():
-    logger.debug("Parsing command line args")
-    parser = argparse.ArgumentParser(
-        description="Extract vulnerability IDs out of Metasploit Framework"
-    )
-    parser.add_argument(
-        "--config",
-        dest="cfgpath",
-        action="store",
-        type=str,
-        default="../config.yaml",
-        help="path to config.yaml",
-    )
-
-    args = parser.parse_args()
-
-    for k, v in vars(args).items():
-        logger.debug(f"... {k}: {v}")
-    return args
-
-
 def main():
     # parse args
-    args = _parse_args()
+    args = parse_args(defaults)
 
     # read config
     cfg = read_config(args.cfgpath)
@@ -84,14 +60,15 @@ def main():
     logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
     ch, commit_hashes = get_commit_hashes_from_repo(cfg["repo_path"])
 
-    commit_handler = partial(_commit_handler, repo_path=cfg["repo_path"])
+    _commit_handler = partial(commit_handler, repo_path=cfg["repo_path"])
 
     logger.info(f"Processing {len(commit_hashes)} commits...")
+
     pool = mp.Pool()
-    commit_data = pool.imap_unordered(
-        func=commit_handler, iterable=commit_hashes, chunksize=20
-    )
-    results2 = pool.imap_unordered(func=_dh, iterable=commit_data)
+    logger.info(f"Poolsize: {len(pool._pool)}")
+
+    commit_data = pool.imap_unordered(func=_commit_handler, iterable=commit_hashes)
+    results2 = pool.imap_unordered(func=dh, iterable=commit_data)
 
     data = []
     for r in results2:
@@ -100,7 +77,10 @@ def main():
     logger.info("Create dataframe from commits")
     df = commits_to_df(data)
 
-    fname_base = "vul_sightings"
+    if len(df) < 1:
+        logger.warning("DataFrame appears empty!")
+
+    fname_base = cfg["outfile_basename"]
     json_fname = f"{fname_base}_{ch}.json"
     json_file = os.path.join(cfg["output_path"], json_fname)
 

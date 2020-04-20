@@ -4,6 +4,7 @@ file: repo_drill_common
 author: adh
 created_at: 4/16/20 9:29 AM
 """
+import argparse
 import multiprocessing as mp
 import os
 from datetime import datetime
@@ -14,6 +15,7 @@ from pydriller import RepositoryMining
 
 from git_repo_crawler.patterns import PATTERN, normalize
 import logging
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -172,7 +174,7 @@ def pull_repo(repo_path, clone_url):
     origin.pull()
 
 
-def _commit_handler(commit_hash=None, repo_path=None):
+def commit_handler(commit_hash=None, repo_path=None):
     # RepositoryMining uses a pydriller.GitRepository object.
     # in turn that GitRepository object attempts to set a file based
     # config.lock on the .git/config file in the repository when the
@@ -180,11 +182,11 @@ def _commit_handler(commit_hash=None, repo_path=None):
     # run into a problem where all the processes are trying to create that lock at
     # the same time. So we need to use our own multiprocessing.Lock here to avoid
     # the locking failure.
+    commit = None
     with lock:
         rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
         # we're doing a single commit, but traverse_commits is still a generator
         # so this for loop is just a formality
-        commit = None
         for _commit in rm.traverse_commits():
             commit = _commit
 
@@ -196,7 +198,7 @@ def _commit_handler(commit_hash=None, repo_path=None):
     return data
 
 
-def _dh(data):
+def dh(data):
     refined = []
     if len(data["vul_ids"]):
         # at this point, we don't need to keep every single line that changed
@@ -224,3 +226,24 @@ def clone_or_pull_repo(cfg):
         git.Repo.clone_from(url=cfg["clone_url"], to_path=cfg["repo_path"])
     else:
         pull_repo(cfg["repo_path"], cfg["clone_url"])
+
+
+def parse_args(defaults):
+    logger.debug("Parsing command line args")
+    parser = argparse.ArgumentParser(
+        description="Extract vulnerability IDs out of a git repository"
+    )
+    parser.add_argument(
+        "--config",
+        dest="cfgpath",
+        action="store",
+        type=str,
+        default=defaults["cfgpath"],
+        help="path to config.yaml",
+    )
+
+    args = parser.parse_args()
+
+    for k, v in vars(args).items():
+        logger.debug(f"... {k}: {v}")
+    return args

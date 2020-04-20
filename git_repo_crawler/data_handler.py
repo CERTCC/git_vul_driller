@@ -39,7 +39,6 @@ def read_multi_json(output_path):
 
 
 def dump_json(df, json_file):
-
     logger.info(f"Write to {json_file}")
     df.to_json(
         path_or_buf=json_file,
