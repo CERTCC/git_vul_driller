@@ -219,10 +219,17 @@ def dh(data):
     return refined
 
 
-def get_commit_hashes_from_repo(repo_path):
+def get_commit_hashes_from_repo(repo_path, last_=None):
+
     repo = git.Repo(repo_path)
-    commit_hashes = [c.hexsha for c in repo.iter_commits()]
+
+    if last_ is not None:
+        commit_hashes = [c.hexsha for c in repo.iter_commits(rev=f"{last_}..HEAD")]
+    else:
+        commit_hashes = [c.hexsha for c in repo.iter_commits()]
+
     head_commit_hash = repo.head.commit.hexsha
+
     return head_commit_hash, commit_hashes
 
 
@@ -276,7 +283,18 @@ def main(defaults):
 
     # get list of commits
     logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
-    ch, commit_hashes = get_commit_hashes_from_repo(cfg["repo_path"])
+
+    last_hash_checked = None
+    fname_base = cfg["outfile_basename"]
+    last_hash_fname = f"last_check_{fname_base}"
+    last_hash_path = os.path.join(cfg["work_path"], last_hash_fname)
+    if os.path.exists(last_hash_path):
+        with open(last_hash_path, "r") as fp:
+            last_hash_checked = fp.read().strip()
+
+    most_recent_commit_hash, commit_hashes = get_commit_hashes_from_repo(
+        cfg["repo_path"], last_hash_checked
+    )
 
     _commit_handler = partial(commit_handler, repo_path=cfg["repo_path"])
 
@@ -285,25 +303,36 @@ def main(defaults):
     pool = mp.Pool()
     logger.info(f"Poolsize: {len(pool._pool)}")
 
-    commit_data = pool.imap_unordered(func=_commit_handler, iterable=commit_hashes)
-    results2 = pool.imap_unordered(func=dh, iterable=commit_data)
-
     data = []
-    for r in results2:
-        data.extend(r)
+    if len(commit_hashes):
+        commit_data = pool.imap_unordered(func=_commit_handler, iterable=commit_hashes)
+        results2 = pool.imap_unordered(func=dh, iterable=commit_data)
 
-    logger.info("Create dataframe from commits")
-    df = commits_to_df(data)
+        for r in results2:
+            data.extend(r)
+    else:
+        logger.warning("No commit hashes found")
 
-    if len(df) < 1:
-        logger.warning("DataFrame appears empty!")
+    if len(data):
+        logger.info("Create dataframe from commits")
+        df = commits_to_df(data)
 
-    fname_base = cfg["outfile_basename"]
-    json_fname = f"{fname_base}_{ch}.json"
-    json_file = os.path.join(cfg["output_path"], json_fname)
+        if len(df) < 1:
+            logger.warning("DataFrame appears empty!")
 
-    logger.info("Dumping data to JSON")
-    dump_json(df, json_file)
+        json_fname = f"{fname_base}_{most_recent_commit_hash}.json"
+        json_file = os.path.join(cfg["output_path"], json_fname)
+
+        logger.info("Dumping data to JSON")
+        dump_json(df, json_file)
+
+        # update the last hash file
+        with open(last_hash_path, "w") as fp:
+            fp.write(most_recent_commit_hash)
+            fp.write("\n")
+
+    else:
+        logger.warning("No data found")
 
     logger.info("Done")
 

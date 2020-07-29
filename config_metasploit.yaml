@@ -1,0 +1,6 @@
+work_path: "data"
+repo_path: "metasploit-framework"
+clone_url: https://github.com/rapid7/metasploit-framework.git
+output_path: "output"
+outfile_basename: "vul_sightings_metasploit"
+logfile: "../log/repo_drill_metasploit.log"
