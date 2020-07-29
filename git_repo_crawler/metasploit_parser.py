@@ -8,22 +8,37 @@ Metasploit contains a file called "modules_metadata_base.json"
 
 This module parses that json file and extracts some useful fields into a pandas dataframe
 """
-import json
 from pprint import pformat
 import pandas as pd
-
+import argparse
+from git_repo_crawler.config import read_config
+import os
+from git_repo_crawler.patterns import PATTERN, normalize
 import logging
 
-logging.basicConfig(
-    filename="../log/metasploit_parser.log", filemode="w", level=logging.DEBUG
-)
+from git_repo_crawler.data_handler import read_json, dump_json
+
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.DEBUG)
+hdlr = logging.StreamHandler()
+hdlr.setLevel(logging.DEBUG)
+logger.addHandler(hdlr)
 
 _logged_record_count = 0
 _max_logged_records = 20
 _done_logging = False
+
+
+def find_pattern_matches(str_, pattern, normalizer=None):
+    matches = set()
+
+    for m in pattern.findall(str_):
+        if normalizer is not None:
+            m = normalizer(m)
+        matches.add(m)
+
+    return list(matches)
 
 
 def extract_record(key, record):
@@ -57,8 +72,14 @@ def extract_record(key, record):
 
 
 def invert_refs(record):
-    refs = record.get("references")
     fields = [k for k in record.keys() if k != "references"]
+
+    refs = []
+    for ref in record.get("references"):
+        refs.append(ref)
+
+        matches = find_pattern_matches(ref, pattern=PATTERN, normalizer=normalize)
+        refs.extend(matches)
 
     inverted = []
     for ref in refs:
@@ -68,10 +89,65 @@ def invert_refs(record):
     return inverted
 
 
+def _parse_args():
+    logger.debug("Parsing command line args")
+    parser = argparse.ArgumentParser(
+        description="Parse vulnerability IDs out of Metasploit Framework's internal metadata"
+    )
+    parser.add_argument(
+        "--config",
+        dest="cfgpath",
+        action="store",
+        type=str,
+        default="../config_metasploit.yaml",
+        help="path to config_metasploit.yaml",
+    )
+
+    args = parser.parse_args()
+
+    for k, v in vars(args).items():
+        logger.debug(f"... {k}: {v}")
+    return args
+
+
+def mtsp_to_df(data):
+    """In: the metasploit metadata json as a python object
+    Out: a pandas dataframe"""
+    rows = []
+    for k, v in data.items():
+        rec = extract_record(k, v)
+        new_rows = invert_refs(rec)
+        rows.extend(new_rows)
+
+    df = pd.DataFrame(rows)
+
+    # eliminate extra whitespace
+    df["description"] = df["description"].apply(lambda x: " ".join(x.split()))
+    df["mod_time"] = pd.to_datetime(df["mod_time"])
+    df["disclosure_date"] = pd.to_datetime(df["disclosure_date"])
+    df["source"] = "metasploit_framework_db"
+
+    df = df.drop_duplicates()
+    return df
+
+
 def main():
-    mtsp_json = "../data/metasploit-framework/db/modules_metadata_base.json"
-    data = read_mstp_json(mtsp_json)
+
+    args = _parse_args()
+
+    cfg = read_config(args.cfgpath)
+
+    mtsp_json = os.path.join(cfg["repo_path"], "db/modules_metadata_base.json")
+
+    logger.debug(f"Repo_path: {mtsp_json}")
+
+    data = read_json(mtsp_json)
     df = mtsp_to_df(data)
+
+    outfile = "vul_mentions_metasploit_metadata_base.json"
+    outpath = os.path.join(cfg["output_path"], outfile)
+
+    dump_json(df, outpath)
 
     logger.debug(df.__str__())
 
@@ -92,32 +168,6 @@ def main():
             ["name", "mod_time", "disclosure_date", "reference"]
         ]
     )
-
-
-def mtsp_to_df(data):
-    rows = []
-    max = 100000
-    for k, v in data.items():
-        rec = extract_record(k, v)
-        new_rows = invert_refs(rec)
-        rows.extend(new_rows)
-
-        # break early
-        if not max:
-            break
-        max -= 1
-    df = pd.DataFrame(rows)
-
-    df["mod_time"] = pd.to_datetime(df["mod_time"])
-    df["disclosure_date"] = pd.to_datetime(df["disclosure_date"])
-    df["source"] = "metasploit_framework_db"
-    return df
-
-
-def read_mstp_json(mtsp_json):
-    with open(mtsp_json, "r") as fp:
-        data = json.load(fp)
-    return data
 
 
 if __name__ == "__main__":
