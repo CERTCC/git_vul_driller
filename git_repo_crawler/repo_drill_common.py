@@ -263,6 +263,14 @@ def parse_args(defaults):
         logger.debug(f"... {k}: {v}")
     return args
 
+def setup_dirs(cfg):
+    cfgpaths = ["work_path","output_path","log_path"]
+    for key in cfgpaths:
+        path = cfg.get(key)
+
+        os.makedirs(path,exist_ok=True)
+
+        assert os.path.isdir(path), f"Path {path} does not exist"
 
 def main(defaults):
     # parse args
@@ -271,12 +279,10 @@ def main(defaults):
     # read config
     cfg = read_config(args.cfgpath)
 
-    setup_file_logger(cfg["logfile"])
+    setup_dirs(cfg)
 
-    logger.info("Create data and output dirs if needed")
-    # make data and output dirs if needed
-    os.makedirs(cfg["work_path"], exist_ok=True)
-    os.makedirs(cfg["output_path"], exist_ok=True)
+    logfile = os.path.join(cfg["log_path"],cfg["log_file"])
+    setup_file_logger(logfile)
 
     # clone or refresh repo
     clone_or_pull_repo(cfg["repo_path"], cfg["clone_url"])
