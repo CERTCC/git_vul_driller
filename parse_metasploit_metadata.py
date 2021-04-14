@@ -23,14 +23,6 @@ def _parse_args():
         description="Parse vulnerability IDs out of Metasploit Framework's internal metadata"
     )
     parser.add_argument(
-        "--config",
-        dest="cfgpath",
-        action="store",
-        type=str,
-        default="./config_metasploit.yaml",
-        help="path to config_metasploit.yaml",
-    )
-    parser.add_argument(
             "--mtsp-repo",
             dest="repopath",
             action="store",
