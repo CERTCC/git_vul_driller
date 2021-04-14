@@ -1,6 +1,6 @@
-work_path: "data"
+work_path: "../data/sources"
 repo_path: "exploitdb"
 clone_url: "https://github.com/offensive-security/exploitdb.git"
-output_path: "output"
+output_path: "../data/raw"
 outfile_basename: "vul_sightings_edb"
 logfile: "../log/repo_drill_edb.log"

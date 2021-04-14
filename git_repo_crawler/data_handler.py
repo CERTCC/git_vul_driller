@@ -38,6 +38,10 @@ def read_multi_json(output_path):
     return df
 
 
+# set up an alias
+load_all = read_multi_json
+
+
 def dump_json(df, json_file):
     logger.info(f"Write to {json_file}")
     df.to_json(

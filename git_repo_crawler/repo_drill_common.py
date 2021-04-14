@@ -107,12 +107,12 @@ def find_vul_ids(commit_data):
     return matches
 
 
-def process_commit(commit):
+def process_commit(commit, clone_url=None):
     logger.debug(f"processing commit: {commit.hash}")
 
     commit_data = {k: getattr(commit, k, None) for k in commit_fields}
 
-    commit_data["data_source"] = "exploitdb_git"
+    commit_data["data_source"] = clone_url
 
     commit_data["modifications"] = [
         process_modifications(m) for m in commit_data["modifications"]
@@ -182,7 +182,7 @@ def pull_repo(repo_path, clone_url):
     origin.pull()
 
 
-def commit_handler(commit_hash=None, repo_path=None):
+def commit_handler(commit_hash=None, repo_path=None, clone_url=None):
     # RepositoryMining uses a pydriller.GitRepository object.
     # in turn that GitRepository object attempts to set a file based
     # config.lock on the .git/config file in the repository when the
@@ -202,7 +202,7 @@ def commit_handler(commit_hash=None, repo_path=None):
 
     # we only need the lock while we're using the repository miner. Once we have
     # our commit we can go back to full parallel operation.
-    data = process_commit(commit)
+    data = process_commit(commit, clone_url=clone_url)
     return data
 
 
@@ -296,7 +296,9 @@ def main(defaults):
         cfg["repo_path"], last_hash_checked
     )
 
-    _commit_handler = partial(commit_handler, repo_path=cfg["repo_path"])
+    _commit_handler = partial(
+        commit_handler, repo_path=cfg["repo_path"], clone_url=cfg["clone_url"]
+    )
 
     logger.info(f"Processing {len(commit_hashes)} commits...")
 
