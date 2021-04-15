@@ -24,8 +24,26 @@ popd
 python parse_metasploit_metadata.py
 ```
 
-Try `python parse_metasploit_metadata.py --help` for a few options, 
-for example `--mtsp-repo` lets you tell it where to find your git repo clone. 
+Try `python parse_metasploit_metadata.py --help` for a few options:
+
+```
+$ python parse_metasploit_metadata.py --help
+usage: parse_metasploit_metadata.py [-h] [--mtsp-repo REPOPATH] [--outpath OUTPATH] [-r NDAYS] [--today] [--thisweek] [--verbose] [--debug]
+
+Parse vulnerability IDs out of Metasploit Framework's internal metadata
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --mtsp-repo REPOPATH  path to metasploit repo
+  --outpath OUTPATH     path to output directory
+  -r NDAYS, --recent NDAYS
+                        number of days to look back
+  --today               shortcut for '--recent 1'
+  --thisweek            shortcut for '--recent 7'
+  --verbose
+  --debug
+
+```
 
 Output to screen:
 ```
