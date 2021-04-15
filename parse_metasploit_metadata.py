@@ -39,9 +39,27 @@ def _parse_args():
         default="data/raw",
         help="path to output directory",
     )
-    parser.add_argument("--today", dest="today", action="store_true")
-    parser.add_argument("--verbose", dest="verbose", action="store_true")
-    parser.add_argument("--debug", dest="debug", action="store_true")
+    parser.add_argument(
+            "-r",
+        "--recent",
+        dest="ndays",
+        action="store",
+        type=int,
+        default=-1,
+        help="number of days to look back",
+    )
+    parser.add_argument(
+        "--today", dest="ndays", action="store_const", const=1, help="shortcut for '--recent 1'"
+    )
+    parser.add_argument(
+        "--thisweek", dest="ndays", action="store_const", const=7, help="shortcut for '--recent 7'"
+    )
+    parser.add_argument(
+            "--verbose", dest="loglevel", action="store_const", const=logging.INFO
+    )
+    parser.add_argument(
+            "--debug", dest="loglevel", action="store_const", const=logging.DEBUG
+    )
 
     args = parser.parse_args()
 
@@ -78,10 +96,8 @@ def main():
 
     args = _parse_args()
 
-    if args.verbose:
-        logger.setLevel(logging.VERBOSE)
-    if args.debug:
-        logger.setLevel(logging.DEBUG)
+    if args.loglevel:
+        logger.setLevel(args.loglevel)
 
     for k, v in vars(args).items():
         logger.debug(f"... {k}: {v}")
@@ -115,11 +131,13 @@ def main():
 
     dump_json(df, outpath)
 
-    if args.today:
-        today = datetime.now().astimezone()
-        # raise NotImplementedError(df['mod_time'])
+    if args.ndays > 0:
+        offset = args.ndays
+
+        today = datetime.now().date()
+        start = datetime(today.year, today.month, today.day).astimezone()
         df = df.set_index("mod_time")
-        df = df[today - pd.offsets.Day(3) :]
+        df = df[start - pd.offsets.Day(offset) :]
         df = df.reset_index(drop=False)
 
     cve_rows = pd.DataFrame(
