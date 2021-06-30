@@ -1,10 +1,7 @@
-# copy this file to config.yaml, then edit as needed
-
-work_path: "../data"
-
-# repo_path is relative to work_path
-repo_path: "metasploit-framework"
-
-clone_url: https://github.com/rapid7/metasploit-framework.git
-
-output_path: "../output"
+work_path: "./data/sources"
+repo_path: "repo_path_relative_to_work_path"
+clone_url: https://url.to.clone.code.from.example.com
+output_path: "./data/raw"
+outfile_basename: "vul_sightings_example"
+log_path: "./log"
+log_file: "repo_drill_example.log"

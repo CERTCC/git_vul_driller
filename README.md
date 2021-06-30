@@ -3,10 +3,19 @@ Crawl the logs of a git repo and find commits matching a regex.
 
 ## Getting started
 
-1. Copy `config_example.yaml` to `config.yaml`
-2. Edit `config.yaml` to set variables as appropriate
+1. Edit `config_metasploit.yaml` as needed
+2. Edit `config_edb.yaml` as needed
+3. Set up your environment (Hint: Use a virtual env)
+```bash
+$ conda create -n myenv --python=3.8
+$ conda activate myenv
+$ pip install -r requirements.txt
+$ python setup.py install
+```
+4. Run `update_exploits`
+5. Look in `data/raw` for `*.json` and `*.csv` outputs
 
-# Parse Metasploit Metadata
+## Parse Metasploit Metadata
 
 This is a standalone script, and will parse the json metadata file that comes with metasploit.
 
