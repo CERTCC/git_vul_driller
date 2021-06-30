@@ -53,12 +53,11 @@ def dump_json(df, json_file):
     )
 
 
-def dump_csv(c_hash, df, output_path):
-    fname_base = f"vul_sightings_{c_hash}"
-    csv_fname = f"{fname_base}.csv"
-    csv_file = os.path.join(output_path, csv_fname)
+def dump_csv(df, csv_file):
     logger.info(f"Write to {csv_file}")
-    df.to_csv(path_or_buf=csv_file, index=False)
+    df.to_csv(
+        path_or_buf=csv_file, index=False,
+    )
 
 
 def main():

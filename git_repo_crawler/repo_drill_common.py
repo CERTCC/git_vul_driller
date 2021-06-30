@@ -16,7 +16,7 @@ import pandas as pd
 from pydriller import RepositoryMining
 
 from git_repo_crawler.config import read_config
-from git_repo_crawler.data_handler import dump_json
+from git_repo_crawler.data_handler import dump_json, dump_csv
 
 from git_repo_crawler.patterns import PATTERN, normalize
 import logging
@@ -281,26 +281,36 @@ def write_data(df, fname_base, out_path):
     glob_str = f"{out_path}/{fname_base}*.json"
     files = glob.glob(glob_str)
 
-    dataframes = []
+    # start with our new data
+    dataframes = [
+        df,
+    ]
+    # append all the old stuff
     for f in files:
         logger.debug(f"Reading old data from {f}")
         _df = pd.read_json(f)
         dataframes.append(_df)
 
-    dataframes.append(df)
-
-    ignore_cols_with_lists = ["branches", "parents"]
-    # dataframes = set(dataframes)
+    # concatenate all the data into a single dataframe
+    # ignore a few columns that are just lists, because
+    # they can't be hashed when we drop duplicates
+    # then sort it all by reference strings (CVE IDs, etc)
+    ignore_cols = ["branches", "parents"]
     df = pd.concat(dataframes)
-    df = df.drop_duplicates(subset=df.columns.difference(ignore_cols_with_lists))
+    df = df.drop_duplicates(subset=df.columns.difference(ignore_cols))
     df = df.sort_values(by="reference")
     logger.debug(f"Full data has {len(df)} rows")
 
+    # figure out the output name and write the json data
     json_fname = f"{fname_base}.json"
     json_file = os.path.join(out_path, json_fname)
-
     logger.debug(f"Write json data to {json_file}")
     dump_json(df, json_file)
+
+    csv_fname = f"{fname_base}.csv"
+    csv_file = os.path.join(out_path, csv_fname)
+    logger.debug(f"Write csv data to {csv_file}")
+    dump_csv(df, csv_file)
 
     # clean up the other files
     for f in files:
