@@ -1,7 +1,7 @@
-work_path: "../data/sources"
+work_path: "./data/sources"
 repo_path: "metasploit-framework"
 clone_url: https://github.com/rapid7/metasploit-framework.git
-output_path: "../data/raw"
+output_path: "./data/raw"
 outfile_basename: "vul_sightings_metasploit"
-log_path: "../log"
+log_path: "./log"
 log_file: "repo_drill_metasploit.log"

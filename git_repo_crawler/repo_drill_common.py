@@ -9,13 +9,14 @@ import multiprocessing as mp
 import os
 from datetime import datetime
 from functools import partial
+import glob
 
 import git
 import pandas as pd
 from pydriller import RepositoryMining
 
 from git_repo_crawler.config import read_config
-from git_repo_crawler.data_handler import dump_json
+from git_repo_crawler.data_handler import dump_json, dump_csv
 
 from git_repo_crawler.patterns import PATTERN, normalize
 import logging
@@ -263,14 +264,64 @@ def parse_args(defaults):
         logger.debug(f"... {k}: {v}")
     return args
 
+
 def setup_dirs(cfg):
-    cfgpaths = ["work_path","output_path","log_path"]
+    cfgpaths = ["work_path", "output_path", "log_path"]
     for key in cfgpaths:
         path = cfg.get(key)
+        logger.debug(f"Check/create {key}: {path}")
 
-        os.makedirs(path,exist_ok=True)
+        os.makedirs(path, exist_ok=True)
 
         assert os.path.isdir(path), f"Path {path} does not exist"
+
+
+def write_data(df, fname_base, out_path):
+    # read in the old data
+    glob_str = f"{out_path}/{fname_base}*.json"
+    files = glob.glob(glob_str)
+
+    # start with our new data
+    dataframes = [
+        df,
+    ]
+    # append all the old stuff
+    for f in files:
+        logger.debug(f"Reading old data from {f}")
+        _df = pd.read_json(f)
+        dataframes.append(_df)
+
+    # concatenate all the data into a single dataframe
+    # ignore a few columns that are just lists, because
+    # they can't be hashed when we drop duplicates
+    # then sort it all by reference strings (CVE IDs, etc)
+    ignore_cols = ["branches", "parents"]
+    df = pd.concat(dataframes)
+    df = df.drop_duplicates(subset=df.columns.difference(ignore_cols))
+    df = df.sort_values(by="reference")
+    logger.debug(f"Full data has {len(df)} rows")
+
+    # figure out the output name and write the json data
+    json_fname = f"{fname_base}.json"
+    json_file = os.path.join(out_path, json_fname)
+    logger.debug(f"Write json data to {json_file}")
+    dump_json(df, json_file)
+
+    csv_fname = f"{fname_base}.csv"
+    csv_file = os.path.join(out_path, csv_fname)
+    logger.debug(f"Write csv data to {csv_file}")
+    dump_csv(df, csv_file)
+
+    # clean up the other files
+    for f in files:
+        # skip the one we just wrote to
+        if f == json_file:
+            continue
+        logger.debug(f"Removing obsolete data file {f}")
+        os.remove(f)
+
+    pass
+
 
 def main(defaults):
     # parse args
@@ -281,7 +332,7 @@ def main(defaults):
 
     setup_dirs(cfg)
 
-    logfile = os.path.join(cfg["log_path"],cfg["log_file"])
+    logfile = os.path.join(cfg["log_path"], cfg["log_file"])
     setup_file_logger(logfile)
 
     # clone or refresh repo
@@ -328,11 +379,8 @@ def main(defaults):
         if len(df) < 1:
             logger.warning("DataFrame appears empty!")
 
-        json_fname = f"{fname_base}_{most_recent_commit_hash}.json"
-        json_file = os.path.join(cfg["output_path"], json_fname)
-
-        logger.info("Dumping data to JSON")
-        dump_json(df, json_file)
+        logger.info("Writing output data")
+        write_data(df, fname_base, cfg["output_path"])
 
         # update the last hash file
         with open(last_hash_path, "w") as fp:
