@@ -301,6 +301,10 @@ def write_data(df, fname_base, out_path):
     df = df.sort_values(by="reference")
     logger.debug(f"Full data has {len(df)} rows")
 
+    # sort everything by author date
+    df["author_date"] = pd.to_datetime(df["author_date"], utc=True)
+    df = df.sort_values(by="author_date", ascending=True)
+
     # figure out the output name and write the json data
     json_fname = f"{fname_base}.json"
     json_file = os.path.join(out_path, json_fname)
