@@ -26,7 +26,7 @@ logging.getLogger("pydriller.repository_mining").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-lock = mp.Lock()
+# lock = mp.Lock()
 LOG_INTERVAL = 200
 DUMP_INTERVAL = 500
 REFRESH_AFTER_SECONDS = 3600 * 4
@@ -192,11 +192,11 @@ def commit_handler(commit_hash=None, repo_path=None, clone_url=None):
     # the same time. So we need to use our own multiprocessing.Lock here to avoid
     # the locking failure.
     commit = None
-    with lock:
+    with mp.Lock():
         rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
         # we're doing a single commit, but traverse_commits is still a generator
         # so this for loop is just a formality
-        for _commit in rm.traverse_commits():
+        for _commit in list(rm.traverse_commits()):
             commit = _commit
 
     assert commit is not None

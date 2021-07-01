@@ -12,7 +12,8 @@ $ conda activate myenv
 $ pip install -r requirements.txt
 $ python setup.py install
 ```
-4. Run `update_exploits`
+4. Run `update_exploits` Note: This WILL use all your cores until it's done. The first time can take over an hour on a 20-core machine.
+   After that it can do incremental updates.
 5. Look in `data/raw` for `*.json` and `*.csv` outputs
 
 ## Parse Metasploit Metadata
