@@ -352,20 +352,22 @@ def main(defaults):
     # get list of commits
     logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
 
-    last_hash_checked = None
+    repo = git.Repo(cfg["repo_path"])
+    last_run_tag = "last_run"
+
     fname_base = cfg["outfile_basename"]
-    last_hash_fname = f"last_check_{fname_base}"
-    last_hash_path = os.path.join(cfg["work_path"], last_hash_fname)
-    if os.path.exists(last_hash_path):
-        with open(last_hash_path, "r") as fp:
-            last_hash_checked = fp.read().strip()
+
+    try:
+        last_hash_checked = repo.tags[last_run_tag]
+    except AttributeError:
+        last_hash_checked = None
 
     most_recent_commit_hash, commit_hashes = get_commit_hashes_from_repo(
         cfg["repo_path"], last_hash_checked
     )
 
     _commit_handler = partial(
-        commit_handler, repo_path=cfg["repo_path"], clone_url=cfg["clone_url"]
+        commit_handler, repo_path=cfg["repo_path"], clone_url=cfg["clone_url"],
     )
 
     logger.info(f"Processing {len(commit_hashes)} commits...")
@@ -395,13 +397,13 @@ def main(defaults):
         logger.info("Writing output data")
         write_data(df, fname_base, cfg["output_path"])
 
-        # update the last hash file
-        with open(last_hash_path, "w") as fp:
-            fp.write(most_recent_commit_hash)
-            fp.write("\n")
-
     else:
         logger.warning("No data found")
+
+    logger.info(f"Tagging {most_recent_commit_hash} as {last_run_tag}")
+    repo.create_tag(
+        last_run_tag, ref=most_recent_commit_hash, message="Last run tag", force=True,
+    )
 
     logger.info("Done")
 
