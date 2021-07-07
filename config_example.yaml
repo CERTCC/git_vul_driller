@@ -1,0 +1,7 @@
+work_path: "./data/sources"
+repo_path: "repo_path_relative_to_work_path"
+clone_url: https://url.to.clone.code.from.example.com
+output_path: "./data/raw"
+outfile_basename: "vul_sightings_example"
+log_path: "./log"
+log_file: "repo_drill_example.log"

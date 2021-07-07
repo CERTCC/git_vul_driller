@@ -8,27 +8,10 @@ import config as cfg
 # invocation:
 #  python find_ids_in_git_repos.py ../data/RAW/metasploit/metasploit-framework
 
-# List of Vul ID regexes
-IDS = ["CVE-[0-9]{4}-[0-9]+", "CVE.?, +.?[0-9]{4}-[0-9]+", "VU\#[0-9]{2,}"]
-# TODO how to match lines like "[ 'CVE', '2007-2386' ]"
-
-ID_REGEX = "|".join(IDS)  # join into one giant regex
-
-PATTERN = re.compile(ID_REGEX, re.I)
-ID_REGEX_CLI = f'"{ID_REGEX}"'  # enclose in quotes
+from git_repo_crawler.patterns import ID_REGEX, PATTERN, normalize
 
 # we will cache file creation dates so we don't have to look them up all the time
 INIT_DATES = {"author": {}, "committer": {}}
-
-
-def normalize(id_str):
-    # find metasploit code mentioning CVE IDs
-    m = re.match("CVE\D+(\d+-\d+)", id_str)
-    if m:
-        return f"CVE-{m.groups()[0]}"
-
-    # default to no change
-    return id_str
 
 
 def flatten(x):
@@ -122,8 +105,14 @@ def get_logs(g):
         "--all",
         "--patch",
         "--text",
-        '--format=PEALENS|%H,%cn,%aI,%cI,"%s"',  # output formatting
-        f"-G{ID_REGEX}",
+        # output format notes
+        # %H = commit hash
+        # %cn = committer name
+        # %aI = author date, strict ISO 8601
+        # %cI = committer date, strict ISO 8601
+        # %s = subject
+        '--format=PEALENS|%H,%cn,%aI,%cI,"%s"',
+        # f"-G{ID_REGEX}",
     )  # regex
     # '--', '.', ':(exclude)db/*')                    #exclude meta_data files - just duplicate information
 
