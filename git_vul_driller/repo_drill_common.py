@@ -328,6 +328,23 @@ def write_data(df, fname_base, out_path):
     pass
 
 
+def tag_references(repo, df):
+    # sort df by author_date
+    df = df.sort_values(by="author_date", ascending=True)
+    # drop duplicate refs, keep first
+    df = df.drop_duplicates(subset="reference", keep="first")
+
+    def tagger(x):
+        # tag the commit with the reference
+        (tag_str, commit_ref) = x
+        # This happens at the end when we're back to a single process
+        # so we shouldn't need to worry about locking
+        logger.info(f"Tagging {commit_ref} with {tag_str}")
+        repo.create_tag(tag_str, ref=commit_ref, force=True)
+
+    df[["reference", "hash"]].apply(tagger, axis=1)
+
+
 def init(l):
     """Set up a global lock for multiprocessing"""
     global lock
@@ -352,14 +369,15 @@ def main(defaults):
     # get list of commits
     logger.info(f"Get list of commit hashes from {cfg['repo_path']}")
 
+    fname_base = cfg["outfile_basename"]
+
     repo = git.Repo(cfg["repo_path"])
     last_run_tag = "last_run"
 
-    fname_base = cfg["outfile_basename"]
-
     try:
         last_hash_checked = repo.tags[last_run_tag]
-    except AttributeError:
+    except (AttributeError, IndexError) as e:
+        logger.warning(f"Intercepted error: {e}")
         last_hash_checked = None
 
     most_recent_commit_hash, commit_hashes = get_commit_hashes_from_repo(
@@ -390,6 +408,9 @@ def main(defaults):
     if len(data):
         logger.info("Create dataframe from commits")
         df = commits_to_df(data)
+
+        # TODO tag the earliest occurrence of each reference in the repo
+        tag_references(repo, df)
 
         if len(df) < 1:
             logger.warning("DataFrame appears empty!")
