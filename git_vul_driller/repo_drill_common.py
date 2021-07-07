@@ -15,10 +15,10 @@ import git
 import pandas as pd
 from pydriller import RepositoryMining
 
-from git_repo_crawler.config import read_config
-from git_repo_crawler.data_handler import dump_json, dump_csv
+from git_vul_driller.config import read_config
+from git_vul_driller.data_handler import dump_json, dump_csv
 
-from git_repo_crawler.patterns import PATTERN, normalize
+from git_vul_driller.patterns import PATTERN, normalize
 import logging
 
 # suppress pydriller's verbose logging

@@ -56,7 +56,8 @@ def dump_json(df, json_file):
 def dump_csv(df, csv_file):
     logger.info(f"Write to {csv_file}")
     df.to_csv(
-        path_or_buf=csv_file, index=False,
+        path_or_buf=csv_file,
+        index=False,
     )
 
 

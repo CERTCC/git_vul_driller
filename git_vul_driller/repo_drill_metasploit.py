@@ -5,7 +5,7 @@ author: adh
 created_at: 3/27/20 11:45 AM
 """
 import logging
-from git_repo_crawler.repo_drill_common import (
+from git_vul_driller.repo_drill_common import (
     formatter,
     main,
 )

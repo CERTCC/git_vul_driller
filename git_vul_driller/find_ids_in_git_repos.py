@@ -8,7 +8,7 @@ import config as cfg
 # invocation:
 #  python find_ids_in_git_repos.py ../data/RAW/metasploit/metasploit-framework
 
-from git_repo_crawler.patterns import ID_REGEX, PATTERN, normalize
+from git_vul_driller.patterns import ID_REGEX, PATTERN, normalize
 
 # we will cache file creation dates so we don't have to look them up all the time
 INIT_DATES = {"author": {}, "committer": {}}
