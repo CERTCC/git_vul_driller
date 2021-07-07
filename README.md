@@ -1,4 +1,4 @@
-# git_repo_crawler
+# git_vul_driller
 Crawl the logs of a git repo and find commits matching a regex.
 
 ## Getting started
