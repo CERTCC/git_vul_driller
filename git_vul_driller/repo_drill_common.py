@@ -192,12 +192,13 @@ def commit_handler(commit_hash=None, repo_path=None, clone_url=None):
     # the same time. So we need to use our own multiprocessing.Lock here to avoid
     # the locking failure.
     commit = None
-    with mp.Lock():
-        rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
-        # we're doing a single commit, but traverse_commits is still a generator
-        # so this for loop is just a formality
-        for _commit in list(rm.traverse_commits()):
-            commit = _commit
+    lock.acquire()
+    rm = RepositoryMining(path_to_repo=repo_path, single=commit_hash)
+    # we're doing a single commit, but traverse_commits is still a generator
+    # so this for loop is just a formality
+    for _commit in list(rm.traverse_commits()):
+        commit = _commit
+    lock.release()
 
     assert commit is not None
 
@@ -327,6 +328,12 @@ def write_data(df, fname_base, out_path):
     pass
 
 
+def init(l):
+    """Set up a global lock for multiprocessing"""
+    global lock
+    lock = l
+
+
 def main(defaults):
     # parse args
     args = parse_args(defaults)
@@ -363,7 +370,9 @@ def main(defaults):
 
     logger.info(f"Processing {len(commit_hashes)} commits...")
 
-    pool = mp.Pool()
+    # create a shared lock
+    l = mp.Lock()
+    pool = mp.Pool(initializer=init, initargs=(l,))
     logger.info(f"Poolsize: {len(pool._pool)}")
 
     data = []
