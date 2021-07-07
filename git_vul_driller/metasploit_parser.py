@@ -11,7 +11,7 @@ This module parses that json file and extracts some useful fields into a pandas 
 from pprint import pformat
 import pandas as pd
 
-from git_repo_crawler.patterns import PATTERN, normalize
+from git_vul_driller.patterns import PATTERN, normalize
 import logging
 
 logger = logging.getLogger(__name__)
@@ -85,10 +85,14 @@ def mtsp_to_df(data):
     # raise NotImplementedError(df.columns)
     # ['description', 'disclosure_date', 'fullname', 'mod_time', 'name',
     #        'path', 'reference', 'source']
-    col_order = ["reference","disclosure_date","mod_time","path","description",]
+    col_order = [
+        "reference",
+        "disclosure_date",
+        "mod_time",
+        "path",
+        "description",
+    ]
 
     df = df.drop_duplicates()
-    df = df[col_order].sort_values(by="mod_time",ascending=True)
+    df = df[col_order].sort_values(by="mod_time", ascending=True)
     return df
-
-

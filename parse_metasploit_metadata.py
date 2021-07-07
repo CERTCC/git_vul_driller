@@ -12,8 +12,8 @@ from datetime import datetime
 
 import pandas as pd
 
-from git_repo_crawler.data_handler import dump_json, read_json
-from git_repo_crawler.metasploit_parser import mtsp_to_df
+from git_vul_driller.data_handler import dump_json, read_json
+from git_vul_driller.metasploit_parser import mtsp_to_df
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def _parse_args():
         help="path to output directory",
     )
     parser.add_argument(
-            "-r",
+        "-r",
         "--recent",
         dest="ndays",
         action="store",
@@ -49,16 +49,24 @@ def _parse_args():
         help="number of days to look back",
     )
     parser.add_argument(
-        "--today", dest="ndays", action="store_const", const=1, help="shortcut for '--recent 1'"
+        "--today",
+        dest="ndays",
+        action="store_const",
+        const=1,
+        help="shortcut for '--recent 1'",
     )
     parser.add_argument(
-        "--thisweek", dest="ndays", action="store_const", const=7, help="shortcut for '--recent 7'"
+        "--thisweek",
+        dest="ndays",
+        action="store_const",
+        const=7,
+        help="shortcut for '--recent 7'",
     )
     parser.add_argument(
-            "--verbose", dest="loglevel", action="store_const", const=logging.INFO
+        "--verbose", dest="loglevel", action="store_const", const=logging.INFO
     )
     parser.add_argument(
-            "--debug", dest="loglevel", action="store_const", const=logging.DEBUG
+        "--debug", dest="loglevel", action="store_const", const=logging.DEBUG
     )
 
     args = parser.parse_args()
