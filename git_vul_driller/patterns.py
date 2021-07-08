@@ -11,6 +11,8 @@ IDS = [
     "CVE-[0-9]{4}-[0-9]+",
     # find metasploit code mentioning CVE IDs
     "CVE.?, +.?[0-9]{4}-[0-9]+",
+    # some exploitdb matches CVE : YYYY-nnnnn
+    "CVE\s+:\s+[0-9]{4}-[0-9]+",
     "VU\#[0-9]{2,}",
     "BID-\d+",
     # find metasploit code mentioning BIDs
