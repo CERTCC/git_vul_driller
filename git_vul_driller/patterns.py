@@ -10,16 +10,16 @@ import re
 IDS = [
     "CVE-[0-9]{4}-[0-9]+",
     # find metasploit code mentioning CVE IDs
-    "CVE.?, +.?[0-9]{4}-[0-9]+",
+    "CVE.?,\s+.?[0-9]{4}-[0-9]+",
     # some exploitdb matches CVE : YYYY-nnnnn
     "CVE\s+:\s+[0-9]{4}-[0-9]+",
     "VU\#[0-9]{2,}",
     "BID-\d+",
     # find metasploit code mentioning BIDs
-    "BID.?, +.?[0-9]+",
+    "BID.?,\s+.?[0-9]+",
     "OSVDB-\d+",
     # find metasploit code mentioning OSVDBIDs
-    "OSVDB.?, +.?[0-9]+",
+    "OSVDB.?,\s+.?[0-9]+",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
