@@ -20,6 +20,8 @@ IDS = [
     "OSVDB-\d+",
     # find metasploit code mentioning OSVDBIDs
     "OSVDB.?,\s+.?[0-9]+",
+    # find VU# by urls
+    "kb\.cert\.org/vuls/id/\d+",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -56,6 +58,9 @@ def normalize(id_str):
         m = re.match("VU\D+(\d+)", id_str)
         if m:
             return f"VU#{m.groups()[0]}"
-
+    elif id_str.startswith("kb.cert.org"):
+        m = re.match("kb\.cert\.org/vuls/id/(\d+)", id_str)
+        if m:
+            return f"VU#{m.groups()[0]}"
     # default to no change
     return id_str
