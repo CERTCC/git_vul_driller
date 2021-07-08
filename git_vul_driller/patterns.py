@@ -10,16 +10,18 @@ import re
 IDS = [
     "CVE-[0-9]{4}-[0-9]+",
     # find metasploit code mentioning CVE IDs
-    "CVE.?, +.?[0-9]{4}-[0-9]+",
+    "CVE.?,\s+.?[0-9]{4}-[0-9]+",
     # some exploitdb matches CVE : YYYY-nnnnn
     "CVE\s+:\s+[0-9]{4}-[0-9]+",
     "VU\#[0-9]{2,}",
     "BID-\d+",
     # find metasploit code mentioning BIDs
-    "BID.?, +.?[0-9]+",
+    "BID.?,\s+.?[0-9]+",
     "OSVDB-\d+",
     # find metasploit code mentioning OSVDBIDs
-    "OSVDB.?, +.?[0-9]+",
+    "OSVDB.?,\s+.?[0-9]+",
+    # find VU# by urls
+    "kb\.cert\.org/vuls/id/\d+",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -56,6 +58,9 @@ def normalize(id_str):
         m = re.match("VU\D+(\d+)", id_str)
         if m:
             return f"VU#{m.groups()[0]}"
-
+    elif id_str.startswith("kb.cert.org"):
+        m = re.match("kb\.cert\.org/vuls/id/(\d+)", id_str)
+        if m:
+            return f"VU#{m.groups()[0]}"
     # default to no change
     return id_str
