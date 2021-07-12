@@ -24,6 +24,8 @@ IDS = [
     "OSVDB.?,\s+.?[0-9]+",
     # find VU# by urls
     "kb\.cert\.org/vuls/id/\d+",
+    # ICSA
+    "ICSA-[0-9]{2}-[0-9]+-[0-9]+[A-Z]",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -64,5 +66,9 @@ def normalize(id_str):
         m = re.match("kb\.cert\.org/vuls/id/(\d+)", id_str)
         if m:
             return f"VU#{m.groups()[0]}"
+    elif id_str.startswith("ICSA"):
+        m = re.match("ICSA-(\d+)-(\d+)-(\d+\w?)")
+        if m:
+            return f"ICSA-{m.groups[0]-{m.groups[1]}-{m.groups[2]}"
     # default to no change
     return id_str
