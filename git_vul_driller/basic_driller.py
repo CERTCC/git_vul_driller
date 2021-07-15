@@ -5,7 +5,8 @@ author: adh
 created_at: 7/13/21 1:04 PM
 """
 import git
-from pydriller import RepositoryMining
+
+from pydriller import Repository
 
 from git_vul_driller.patterns import PATTERN, normalize
 import logging
@@ -28,9 +29,9 @@ def main(repo_path, start_tag=None):
 
     # figure out which commits we need to process
     if (start_tag is None) or (start_tag not in tags):
-        rm = RepositoryMining(path_to_repo=repo_path)
+        rm = Repository(path_to_repo=repo_path)
     else:
-        rm = RepositoryMining(path_to_repo=repo_path, from_tag=start_tag)
+        rm = Repository(path_to_repo=repo_path, from_tag=start_tag)
 
     # we know which commits to process.
     # ok, let's start
@@ -47,7 +48,7 @@ def main(repo_path, start_tag=None):
             matches.add(m)
 
         # check the adds
-        for mod in commit.modifications:
+        for mod in commit.modified_files:
             n_adds = len(mod.diff_parsed["added"])
             if n_adds < 1:
                 continue
