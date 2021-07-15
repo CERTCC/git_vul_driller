@@ -17,7 +17,7 @@ def main():
     )
     args = parser.parse_args()
 
-    driller(repo_path=args.repo_path, start_tag=TAG)
+    driller(repo_path=args.repo_path, tag=TAG)
 
 
 if __name__ == "__main__":
