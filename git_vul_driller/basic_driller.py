@@ -32,21 +32,35 @@ def main(repo_path, start_tag=None):
     # populate a set of tags once so we can speed up membership checks
     tags = set([t.name for t in repo.tags])
 
+    if start_tag not in tags:
+        start_tag = None
+
     # figure out which commits we need to process
-    if (start_tag is None) or (start_tag not in tags):
-        rm = Repository(path_to_repo=repo_path, order="date-order")
-    else:
-        rm = Repository(path_to_repo=repo_path, from_tag=start_tag, order="date-order")
+    # if (start_tag is None) or (start_tag not in tags):
+    #     rm = Repository(path_to_repo=repo_path, order="date-order")
+    # else:
+    #     rm = Repository(path_to_repo=repo_path, from_tag=start_tag, order="date-order")
 
     # we know which commits to process.
     # ok, let's start
     last_commit = None
-    for commit in rm.traverse_commits():
+    for c in repo.iter_commits(rev=start_tag, reverse=True):
+        # for commit in rm.traverse_commits():
         collected = False
 
-        # print(f"=> Processing commit {commit.hash}")
+        chash = c.hexsha
+
+        print(f"=> Processing commit {chash}")
         # remember it for when the loop ends
-        last_commit = commit.hash
+        last_commit = chash
+
+        # PyDriller is super heavy on memory usage in a loop
+        # so we're going to only create it when we need it
+        rm = Repository(path_to_repo=repo_path, single=chash)
+        commit = None
+        for _commit in rm.traverse_commits():
+            commit = _commit
+        del rm
 
         # check the commit message
         matches = set()
@@ -57,21 +71,23 @@ def main(repo_path, start_tag=None):
                 tags.add(m)
 
         # check the adds
+        counter = 0
         for mod in commit.modified_files:
-            adds = mod.diff_parsed["added"]
-            for (line_no, line_str) in adds:
+            for (line_no, line_str) in mod.diff_parsed["added"]:
                 for m in PATTERN.findall(line_str):
+                    # counter += 1
                     m = normalize(m)
                     if m not in tags:
                         tagit(commit.hash, m, repo)
                         tags.add(m)
-                if random.random() < 0.05:
-                    gc.collect()
-            if not collected:
-                gc.collect()
-                collected = True
-        if not collected:
-            gc.collect()
+                    # if counter > 500:
+                    #     print(" @ garbage collection")
+                    #     gc.collect()
+                    #     counter = 0
+            # if random.random() < 0.1:
+            #     gc.collect()
+        # print(" @ garbage collection")
+        # gc.collect()
 
     # remember where we left off for next time
     if start_tag is not None:
