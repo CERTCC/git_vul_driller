@@ -29,9 +29,9 @@ def main(repo_path, start_tag=None):
 
     # figure out which commits we need to process
     if (start_tag is None) or (start_tag not in tags):
-        rm = Repository(path_to_repo=repo_path)
+        rm = Repository(path_to_repo=repo_path, order="date-order")
     else:
-        rm = Repository(path_to_repo=repo_path, from_tag=start_tag)
+        rm = Repository(path_to_repo=repo_path, from_tag=start_tag, order="date-order")
 
     # we know which commits to process.
     # ok, let's start
