@@ -47,9 +47,9 @@ def normalize(id_str):
     # note: because we're using "startswith" it's ok to use "match"
     # otherwise we'd want to use "search"
     if id_str.startswith("CVE"):
-        m = re.match("CVE\D+(\d+-\d+)", id_str)
+        m = re.match("CVE\D+(\d+)\D+(\d+)", id_str)
         if m:
-            return f"CVE-{m.groups()[0]}"
+            return f"CVE-{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("BID"):
         m = re.match("BID\D+(\d+)", id_str)
         if m:
@@ -62,13 +62,13 @@ def normalize(id_str):
         m = re.match("VU\D+(\d+)", id_str)
         if m:
             return f"VU#{m.groups()[0]}"
-    elif id_str.startswith("kb.cert.org"):
-        m = re.match("kb\.cert\.org/vuls/id/(\d+)", id_str)
+    elif id_str.startswith("KB.CERT.ORG"):
+        m = re.match("KB\.CERT\.ORG/VULS/ID/(\d+)", id_str)
         if m:
             return f"VU#{m.groups()[0]}"
     elif id_str.startswith("ICSA"):
-        m = re.match("ICSA-(\d+)-(\d+)-(\d+\w?)")
+        m = re.match("ICSA-(\d+)-(\d+)-(\d+\w?)", id_str)
         if m:
-            return f"ICSA-{m.groups[0]-{m.groups[1]}-{m.groups[2]}"
+            return f"ICSA-{m.groups()[0]}-{m.groups()[1]}-{m.groups()[2]}"
     # default to no change
     return id_str
