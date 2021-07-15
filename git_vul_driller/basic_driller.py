@@ -27,19 +27,14 @@ logger.addHandler(ch)
 
 
 # @profile
-def main(repo_path, start_tag=None):
+def main(repo_path, tag=None):
     repo = git.Repo(repo_path)
     # populate a set of tags once so we can speed up membership checks
     tags = set([t.name for t in repo.tags])
 
-    if start_tag not in tags:
-        start_tag = None
-
-    # figure out which commits we need to process
-    # if (start_tag is None) or (start_tag not in tags):
-    #     rm = Repository(path_to_repo=repo_path, order="date-order")
-    # else:
-    #     rm = Repository(path_to_repo=repo_path, from_tag=start_tag, order="date-order")
+    start_tag = None
+    if tag in tags:
+        start_tag = tag
 
     # we know which commits to process.
     # ok, let's start
@@ -80,14 +75,6 @@ def main(repo_path, start_tag=None):
                     if m not in tags:
                         tagit(commit.hash, m, repo)
                         tags.add(m)
-                    # if counter > 500:
-                    #     print(" @ garbage collection")
-                    #     gc.collect()
-                    #     counter = 0
-            # if random.random() < 0.1:
-            #     gc.collect()
-        # print(" @ garbage collection")
-        # gc.collect()
 
     # remember where we left off for next time
     if start_tag is not None:
