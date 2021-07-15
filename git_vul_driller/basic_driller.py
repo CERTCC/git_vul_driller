@@ -68,6 +68,8 @@ def main(repo_path, start_tag=None):
             # but create any new ones
             print(f" + Tagging {commit.hash} with {m}")
             repo.create_tag(m, ref=commit.hash)
+            # avoid duplication in the same run
+            tags.add(m)
 
     # remember where we left off for next time
     if start_tag is not None:
