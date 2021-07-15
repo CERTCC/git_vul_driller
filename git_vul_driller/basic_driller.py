@@ -6,7 +6,11 @@ created_at: 7/13/21 1:04 PM
 """
 import git
 
+# from memory_profiler import profile
+
 from pydriller import Repository
+import gc
+import random
 
 from git_vul_driller.patterns import PATTERN, normalize
 import logging
@@ -22,6 +26,7 @@ ch.setLevel(logging.INFO)
 logger.addHandler(ch)
 
 
+# @profile
 def main(repo_path, start_tag=None):
     repo = git.Repo(repo_path)
     # populate a set of tags once so we can speed up membership checks
@@ -37,7 +42,9 @@ def main(repo_path, start_tag=None):
     # ok, let's start
     last_commit = None
     for commit in rm.traverse_commits():
-        print(f"=> Processing commit {commit.hash}")
+        collected = False
+
+        # print(f"=> Processing commit {commit.hash}")
         # remember it for when the loop ends
         last_commit = commit.hash
 
@@ -45,36 +52,38 @@ def main(repo_path, start_tag=None):
         matches = set()
         for m in PATTERN.findall(commit.msg):
             m = normalize(m)
-            matches.add(m)
+            if m not in tags:
+                tagit(commit.hash, m, repo)
+                tags.add(m)
 
         # check the adds
         for mod in commit.modified_files:
-            n_adds = len(mod.diff_parsed["added"])
-            if n_adds < 1:
-                continue
-
-            for (line_no, line_str) in mod.diff_parsed["added"]:
+            adds = mod.diff_parsed["added"]
+            for (line_no, line_str) in adds:
                 for m in PATTERN.findall(line_str):
                     m = normalize(m)
-                    matches.add(m)
-
-        # tag the matches
-        for m in matches:
-            # don't duplicate existing tags
-            if m in tags:
-                print(f" - Tag {m} already exists at {repo.commit(m)}")
-                continue
-
-            # but create any new ones
-            print(f" + Tagging {commit.hash} with {m}")
-            repo.create_tag(m, ref=commit.hash)
-            # avoid duplication in the same run
-            tags.add(m)
+                    if m not in tags:
+                        tagit(commit.hash, m, repo)
+                        tags.add(m)
+                if random.random() < 0.05:
+                    gc.collect()
+            if not collected:
+                gc.collect()
+                collected = True
+        if not collected:
+            gc.collect()
 
     # remember where we left off for next time
     if start_tag is not None:
         print(f" + Tagging {last_commit} as {start_tag}")
         repo.create_tag(start_tag, ref=(last_commit), force=True)
+
+
+def tagit(chash, m, repo):
+    # but create any new ones
+    print(f" + Tagging {chash} with {m}")
+    repo.create_tag(m, ref=chash)
+    # avoid duplication in the same run
 
 
 if __name__ == "__main__":
