@@ -77,9 +77,9 @@ def main(repo_path, tag=None):
                         tags.add(m)
 
     # remember where we left off for next time
-    if start_tag is not None:
-        print(f" + Tagging {last_commit} as {start_tag}")
-        repo.create_tag(start_tag, ref=(last_commit), force=True)
+    if tag is not None:
+        print(f" + Tagging {last_commit} as {tag}")
+        repo.create_tag(tag, ref=(last_commit), force=True)
 
 
 def tagit(chash, m, repo):
