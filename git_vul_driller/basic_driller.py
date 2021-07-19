@@ -39,7 +39,7 @@ def main(repo_path, tag=None):
     # we know which commits to process.
     # ok, let's start
     last_commit = None
-    for c in repo.iter_commits(rev=start_tag, reverse=True):
+    for c in repo.iter_commits(rev=f"{start_tag}..HEAD", reverse=True):
         # for commit in rm.traverse_commits():
         collected = False
 
@@ -77,7 +77,7 @@ def main(repo_path, tag=None):
                         tags.add(m)
 
     # remember where we left off for next time
-    if tag is not None:
+    if last_commit is not None and tag is not None:
         print(f" + Tagging {last_commit} as {tag}")
         repo.create_tag(tag, ref=(last_commit), force=True)
 
