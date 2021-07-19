@@ -36,11 +36,17 @@ def main(repo_path, tag=None):
     if tag in tags:
         start_tag = tag
 
+    if start_tag is None:
+        iter_rev_str = None
+    else:
+        iter_rev_str = f"{start_tag}..HEAD"
+
     new_tags = set()
     # we know which commits to process.
     # ok, let's start
     last_commit = None
-    for c in repo.iter_commits(rev=f"{start_tag}..HEAD", reverse=True):
+
+    for c in repo.iter_commits(rev=iter_rev_str, reverse=True):
         # for commit in rm.traverse_commits():
         collected = False
 
