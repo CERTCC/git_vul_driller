@@ -36,6 +36,7 @@ def main(repo_path, tag=None):
     if tag in tags:
         start_tag = tag
 
+    new_tags = set()
     # we know which commits to process.
     # ok, let's start
     last_commit = None
@@ -64,6 +65,7 @@ def main(repo_path, tag=None):
             if m not in tags:
                 tagit(commit.hash, m, repo)
                 tags.add(m)
+                new_tags.add(m)
 
         # check the adds
         counter = 0
@@ -75,6 +77,13 @@ def main(repo_path, tag=None):
                     if m not in tags:
                         tagit(commit.hash, m, repo)
                         tags.add(m)
+                        new_tags.add(m)
+
+    # write out new tags to a file
+    tag_file = "new_tags.txt"
+    with open(tag_file, "w") as fp:
+        fp.write("\n".join(new_tags))
+        fp.write("\n")
 
     # remember where we left off for next time
     if last_commit is not None and tag is not None:
