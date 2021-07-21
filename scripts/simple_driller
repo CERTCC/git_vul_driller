@@ -1,0 +1,24 @@
+#!/usr/bin/env python
+"""
+file: simple_driller
+author: adh
+created_at: 7/15/21 10:08 AM
+"""
+import argparse
+from git_vul_driller.basic_driller import main as driller
+
+TAG = "simple_driller"
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "repo_path", type=str, help="path to the repo you want to process"
+    )
+    args = parser.parse_args()
+
+    driller(repo_path=args.repo_path, tag=TAG)
+
+
+if __name__ == "__main__":
+    main()
