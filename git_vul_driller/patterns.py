@@ -58,6 +58,10 @@ def normalize(id_str):
 
     # note: because we're using "startswith" it's ok to use "match"
     # otherwise we'd want to use "search"
+    #
+    # also, since we've already matched the ID patterns above,
+    # we can be a bit more liberal in our pattern matching here
+    # (e.g., using \D instead of specific delimiters)
     if id_str.startswith("CVE"):
         m = re.match("CVE\D+(\d+)\D+(\d+)", id_str)
         if m:
@@ -86,7 +90,6 @@ def normalize(id_str):
         m = re.match("ICSA-(\d+)-(\d+)-(\d+\w?)", id_str)
         if m:
             return f"ICSA-{m.groups()[0]}-{m.groups()[1]}-{m.groups()[2]}"
-    # default to no change
     elif id_str.startswith("UVI"):
         m = re.match("UVI\D+(\d+)\D+(\d+)", id_str)
         if m:
