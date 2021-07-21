@@ -8,9 +8,9 @@ import re
 
 
 IDS = [
-    "CVE-[0-9]{4}-[0-9]+",
+    # sometimes with dashes,
     # sometimes with underscores, like in urls
-    "CVE_[0-9]{4}_[0-9]+",
+    "CVE[-_][0-9]{4}[-_][0-9]+",
     # find metasploit code mentioning CVE IDs
     "CVE.?,\s+.?[0-9]{4}-[0-9]+",
     # some exploitdb matches CVE : YYYY-nnnnn
