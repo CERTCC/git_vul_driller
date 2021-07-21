@@ -32,6 +32,9 @@ IDS = [
     "UVI-[0-9]{4}-[0-9]+",
     # microsoft
     "MS[0-9]{2}-[0-9]+",
+    # zero day inititative (two ID formats)
+    "ZDI-CAN-[0-9]+",
+    "ZDI-[0-9]{2}-[0-9]+",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -89,4 +92,16 @@ def normalize(id_str):
         m = re.match("MS(\d+)-(\d+)", id_str)
         if m:
             return f"MS{m.groups()[0]}-{m.groups()[1]}"
+    elif id_str.startswith("ZDI"):
+        # Zero Day Initiative has two ID formats
+        if id_str.startswith("ZDI-CAN"):
+            # ZDI-CAN-NNN
+            m = re.match("ZDI-CAN-(\d+)", id_str)
+            if m:
+                return f"ZDI-CAN-{m.groups()[0]}"
+        else:
+            # ZDI-NN-NNN
+            m = re.match("ZDI-(\d+)-(\d+)", id_str)
+            if m:
+                return f"ZDI-{m.groups()[0]}-{m.groups()[1]}"
     return id_str
