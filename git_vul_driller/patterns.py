@@ -63,59 +63,61 @@ def normalize(id_str):
     # we can be a bit more liberal in our pattern matching here
     # (e.g., using \D instead of specific delimiters)
     if id_str.startswith("CVE"):
-        m = re.match("CVE\D+(\d+)\D+(\d+)", id_str)
+        m = re.match("CVE\D+(\d+)\D+(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"CVE-{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("BID"):
-        m = re.match("BID\D+(\d+)", id_str)
+        m = re.match("BID\D+(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"BID-{m.groups()[0]}"
     elif id_str.startswith("SECURITYFOCUS.COM"):
-        m = re.match("SECURITYFOCUS\.COM/BID/(\d+)", id_str)
+        m = re.match("SECURITYFOCUS\.COM/BID/(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"BID-{m.groups()[0]}"
     elif id_str.startswith("OSVDB"):
-        m = re.match("OSVDB\D+(\d+)", id_str)
+        m = re.match("OSVDB\D+(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"OSVDB-{m.groups()[0]}"
     elif id_str.startswith("VU"):
-        m = re.match("VU\D+(\d+)", id_str)
+        m = re.match("VU\D+(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"VU#{m.groups()[0]}"
     elif id_str.startswith("KB.CERT.ORG"):
-        m = re.match("KB\.CERT\.ORG/VULS/ID/(\d+)", id_str)
+        m = re.match("KB\.CERT\.ORG/VULS/ID/(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"VU#{m.groups()[0]}"
     elif id_str.startswith("ICSA"):
-        m = re.match("ICSA-(\d+)-(\d+)-(\d+\w?)", id_str)
+        m = re.match("ICSA-(\d+)-(\d+)-(\d+\w?)", id_str, re.IGNORECASE)
         if m:
             return f"ICSA-{m.groups()[0]}-{m.groups()[1]}-{m.groups()[2]}"
     elif id_str.startswith("UVI"):
-        m = re.match("UVI\D+(\d+)\D+(\d+)", id_str)
+        m = re.match("UVI\D+(\d+)\D+(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"UVI-{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("MS"):
-        m = re.match("MS(\d+)-(\d+)", id_str)
+        m = re.match("MS(\d+)-(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"MS{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("ZDI"):
         # Zero Day Initiative has two ID formats
         if id_str.startswith("ZDI-CAN"):
             # ZDI-CAN-NNN
-            m = re.match("ZDI-CAN-(\d+)", id_str)
+            m = re.match("ZDI-CAN-(\d+)", id_str, re.IGNORECASE)
             if m:
                 return f"ZDI-CAN-{m.groups()[0]}"
         else:
             # ZDI-NN-NNN
-            m = re.match("ZDI-(\d+)-(\d+)", id_str)
+            m = re.match("ZDI-(\d+)-(\d+)", id_str, re.IGNORECASE)
             if m:
                 return f"ZDI-{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("BUGS.CHROMIUM.ORG"):
-        m = re.search("PROJECT-ZERO/ISSUES/DETAIL\?ID=(\d+)", id_str)
+        m = re.search("PROJECT-ZERO/ISSUES/DETAIL\?ID=(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"GPZ-{m.groups()[0]}"
     elif id_str.startswith("CODE.GOOGLE.COM"):
-        m = re.search("GOOGLE-SECURITY-RESEARCH/ISSUES/DETAIL\?id=(\d+)", id_str)
+        m = re.search(
+            "GOOGLE-SECURITY-RESEARCH/ISSUES/DETAIL\?ID=(\d+)", id_str, re.IGNORECASE
+        )
         if m:
             return f"GPZ-{m.groups()[0]}"
         # default to no change
