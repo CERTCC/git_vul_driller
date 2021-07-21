@@ -17,6 +17,8 @@ IDS = [
     "CVE\s+:\s+[0-9]{4}-[0-9]+",
     "VU\#[0-9]{2,}",
     "BID-\d+",
+    # bugtraq id in urls
+    "securityfocus\.com/bid/\d+",
     # find metasploit code mentioning BIDs
     "BID.?,\s+.?[0-9]+",
     "OSVDB-\d+",
@@ -52,6 +54,10 @@ def normalize(id_str):
             return f"CVE-{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("BID"):
         m = re.match("BID\D+(\d+)", id_str)
+        if m:
+            return f"BID-{m.groups()[0]}"
+    elif id_str.startswith("SECURITYFOCUS.COM"):
+        m = re.match("securityfocus\.com/bid/(\d+)", id_str)
         if m:
             return f"BID-{m.groups()[0]}"
     elif id_str.startswith("OSVDB"):
