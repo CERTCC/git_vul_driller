@@ -71,7 +71,7 @@ def normalize(id_str):
         if m:
             return f"BID-{m.groups()[0]}"
     elif id_str.startswith("SECURITYFOCUS.COM"):
-        m = re.match("securityfocus\.com/bid/(\d+)", id_str)
+        m = re.match("SECURITYFOCUS\.COM/BID/(\d+)", id_str)
         if m:
             return f"BID-{m.groups()[0]}"
     elif id_str.startswith("OSVDB"):
