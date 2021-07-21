@@ -28,6 +28,8 @@ IDS = [
     "kb\.cert\.org/vuls/id/\d+",
     # ICSA
     "ICSA-[0-9]{2}-[0-9]+-[0-9]+[A-Z]",
+    # UVI https://github.com/cloudsecurityalliance/uvi-database
+    "UVI-[0-9]{4}-[0-9]+",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -77,4 +79,8 @@ def normalize(id_str):
         if m:
             return f"ICSA-{m.groups()[0]}-{m.groups()[1]}-{m.groups()[2]}"
     # default to no change
+    elif id_str.startswith("UVI"):
+        m = re.match("UVI\D+(\d+)\D+(\d+)", id_str)
+        if m:
+            return f"UVI-{m.groups()[0]}-{m.groups()[1]}"
     return id_str
