@@ -38,6 +38,8 @@ IDS = [
     # Google Project Zero
     "bugs\.chromium\.org/p/project-zero/issues/detail\?id=\d+",
     "code.google.com/p/google-security-research/issues/detail\?id=\d+",
+    # Zero Science Lab
+    "ZSL-\d{4}-\d+",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -110,6 +112,11 @@ def normalize(id_str):
             m = re.match("ZDI-(\d+)-(\d+)", id_str, re.IGNORECASE)
             if m:
                 return f"ZDI-{m.groups()[0]}-{m.groups()[1]}"
+    elif id_str.startswith("ZSL"):
+        # ZDI-NN-NNN
+        m = re.match("ZSL-(\d+)-(\d+)", id_str, re.IGNORECASE)
+        if m:
+            return f"ZSL-{m.groups()[0]}-{m.groups()[1]}"
     elif id_str.startswith("BUGS.CHROMIUM.ORG"):
         m = re.search("PROJECT-ZERO/ISSUES/DETAIL\?ID=(\d+)", id_str, re.IGNORECASE)
         if m:
