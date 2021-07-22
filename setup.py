@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="git_vul_driller",
-    version="0.6",
+    version="0.8",
     packages=["git_vul_driller"],
     url="https://vuls.cert.org",
     license="MIT",
