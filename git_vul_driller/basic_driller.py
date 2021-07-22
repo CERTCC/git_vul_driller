@@ -9,8 +9,6 @@ import git
 # from memory_profiler import profile
 
 from pydriller import Repository
-import gc
-import random
 
 from git_vul_driller.patterns import PATTERN, normalize
 import logging
@@ -47,12 +45,9 @@ def main(repo_path, tag=None):
     last_commit = None
 
     for c in repo.iter_commits(rev=iter_rev_str, reverse=True):
-        # for commit in rm.traverse_commits():
-        collected = False
 
         chash = c.hexsha
 
-        print(f"=> Processing commit {chash}")
         # remember it for when the loop ends
         last_commit = chash
 
@@ -64,26 +59,25 @@ def main(repo_path, tag=None):
             commit = _commit
         del rm
 
-        # check the commit message
         matches = set()
-        for m in PATTERN.findall(commit.msg):
-            m = normalize(m)
-            if m not in tags:
-                tagit(commit.hash, m, repo)
-                tags.add(m)
-                new_tags.add(m)
+        # check the commit message
+        matches.update([normalize(m) for m in PATTERN.findall(commit.msg)])
 
         # check the adds
-        counter = 0
         for mod in commit.modified_files:
             for (line_no, line_str) in mod.diff_parsed["added"]:
-                for m in PATTERN.findall(line_str):
-                    # counter += 1
-                    m = normalize(m)
-                    if m not in tags:
-                        tagit(commit.hash, m, repo)
-                        tags.add(m)
-                        new_tags.add(m)
+                matches.update([normalize(m) for m in PATTERN.findall(line_str)])
+
+        # figure out which ones are new and tag them
+        new_matches = matches - tags
+        for m in new_matches:
+            tagit(commit.hash, m, repo)
+        if len(new_matches) == 0:
+            print(f"= {chash[:8]}")
+
+        # keep track of what we did so we don't duplicate it
+        tags.update(new_matches)
+        new_tags.update(new_matches)
 
     # write out new tags to a file
     tag_file = "new_tags.txt"
@@ -93,19 +87,19 @@ def main(repo_path, tag=None):
 
     # remember where we left off for next time
     if last_commit is not None and tag is not None:
-        print(f" + Tagging {last_commit} as {tag}")
-        repo.create_tag(tag, ref=(last_commit), force=True)
+        print(f"+ {last_commit} <-- {tag}")
+        repo.create_tag(tag, ref=last_commit, force=True)
 
 
 def tagit(chash, m, repo):
     # but create any new ones
-    print(f" + Tagging {chash} with {m}")
+    print(f"+ {chash[:8]} <-- {m}")
     repo.create_tag(m, ref=chash)
     # avoid duplication in the same run
 
 
 if __name__ == "__main__":
-    repo_path = "data/sources/metasploit-framework"
+    repo_path = "data/sources/exploitdb"
     # start_tag = "last_run"
     start_tag = "test_run"
     # start_tag = None
