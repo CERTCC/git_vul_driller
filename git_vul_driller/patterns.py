@@ -6,7 +6,11 @@ created_at: 3/27/20 9:47 AM
 """
 import re
 import os
-from labyrinth.errors import LabyrinthPatternError
+
+
+class LabyrinthPatternError(Exception):
+    pass
+
 
 IDS = [
     # sometimes with dashes,
