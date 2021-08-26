@@ -87,7 +87,7 @@ def main(repo_path, tag=None):
 
     # remember where we left off for next time
     if last_commit is not None and tag is not None:
-        print(f"+ {last_commit} <-- {tag}")
+        print(f"+ {last_commit[:8]} <-- {tag}")
         repo.create_tag(tag, ref=last_commit, force=True)
 
 
