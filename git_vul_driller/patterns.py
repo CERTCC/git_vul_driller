@@ -51,6 +51,8 @@ IDS = [
     "CNVD[-_]C[-_][0-9]{4}[-_][0-9]+",
     # china NNVD CNNVD-{YYYY}{MM}-{NNN}
     "CNNVD[-_][0-9]{6}[-_][0-9]+",
+    # github security advisories e.g. GHSA-289g-75hj-mg9m
+    "GHSA[-_][a-z0-9]{4}[-_][a-z0-9]{4}[-_][a-z0-9]{4}",
 ]
 ID_REGEX = "|".join(IDS)  # join into one giant regex
 PATTERN = re.compile(ID_REGEX, re.I)  # compile it case insensitive
@@ -149,7 +151,12 @@ def normalize(id_str):
         m = re.search("CNNVD\D+(\d+)\D+(\d+)", id_str, re.IGNORECASE)
         if m:
             return f"CNNVD-{m.groups()[0]}-{m.groups()[1]}"
-
+        
+    elif id_str.startswith("GHSA"):
+        m = re.match("GHSA[^a-z0-9]*([a-z0-9]+)[^a-z0-9]*([a-z0-9]+)[^a-z0-9]*([a-z0-9]+)", id_str, re.IGNORECASE)
+        if m:
+            return f"GHSA-{m.groups()[0])-{m.groups()[1]}-{m.groups()[2]}"
+     
     # default to no change
     return id_str
 
