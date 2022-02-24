@@ -155,7 +155,7 @@ def normalize(id_str):
     elif id_str.startswith("GHSA"):
         m = re.match("GHSA[^a-z0-9]*([a-z0-9]+)[^a-z0-9]*([a-z0-9]+)[^a-z0-9]*([a-z0-9]+)", id_str, re.IGNORECASE)
         if m:
-            return f"GHSA-{m.groups()[0])-{m.groups()[1]}-{m.groups()[2]}"
+            return f"GHSA-{m.groups()[0]}-{m.groups()[1]}-{m.groups()[2]}"
      
     # default to no change
     return id_str
